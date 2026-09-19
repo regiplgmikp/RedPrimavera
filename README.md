@@ -1,5 +1,5 @@
 
-﻿# RedPrimavera
+### RedPrimavera
 
 Proyecto de análisis espacial del Bosque La Primavera. Integra datos de
 observaciones de especies, celdas H3, caminos y redes de co-ocurrencia en
