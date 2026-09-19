@@ -1,0 +1,203 @@
+import argparse
+import json
+import math
+import os
+import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Permite importar desde la carpeta utils/ en la raíz del proyecto
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from utils.neo4j_conn import get_driver
+
+# Carga variables de entorno (.env)
+load_dotenv()
+
+try:
+    import geopandas as gpd
+except ImportError:
+    sys.exit("Falta geopandas. Instala con: pip install geopandas")
+
+try:
+    from shapely.geometry import shape
+except ImportError:
+    sys.exit("Falta shapely. Instala con: pip install shapely")
+
+try:
+    import h3
+except ImportError:
+    sys.exit("Falta h3. Instala con: pip install h3")
+
+
+BATCH_SIZE = 500
+TIPOS_INTERNO = {"path", "track", "footway", "bridleway", "steps"}
+
+
+def chunks(lista, tam):
+    for i in range(0, len(lista), tam):
+        yield lista[i : i + tam]
+
+
+def cargar_poligono_blp(path_geojson: str):
+    with open(path_geojson, "r", encoding="utf-8") as f:
+        gj = json.load(f)
+    return shape(gj["features"][0]["geometry"])
+
+
+def cargar_caminos(path_input: str, tipo_default: str) -> gpd.GeoDataFrame:
+    gdf = gpd.read_file(path_input)
+    if gdf.crs is None:
+        print("AVISO: el archivo no trae CRS definido, asumiendo EPSG:4326.")
+        gdf = gdf.set_crs(epsg=4326)
+    elif gdf.crs.to_epsg() != 4326:
+        gdf = gdf.to_crs(epsg=4326)
+
+    gdf = gdf.reset_index(drop=True)
+
+    if "highway" in gdf.columns:
+        gdf["tipo"] = gdf["highway"].apply(
+            lambda h: "interno" if h in TIPOS_INTERNO else "vialidad"
+        )
+        print("Clasificación automática por columna 'highway' (OSM/Overpass).")
+        print(gdf["tipo"].value_counts().to_string())
+    else:
+        gdf["tipo"] = tipo_default
+        print(f"Sin columna 'highway'; usando --tipo={tipo_default} para todas las filas.")
+
+    gdf["camino_id"] = [
+        f"{row['tipo']}_{i}" for i, row in enumerate(gdf.to_dict(orient="records"))
+    ]
+    return gdf
+
+
+def filtrar_dentro_del_poligono(gdf: gpd.GeoDataFrame, poligono) -> gpd.GeoDataFrame:
+    antes = len(gdf)
+    dentro = gdf[gdf.geometry.within(poligono)].reset_index(drop=True)
+    descartados = antes - len(dentro)
+    print(
+        f"Filtro de cobertura: {len(dentro)}/{antes} caminos 100% dentro del polígono "
+        f"({descartados} descartados por cruzar el borde o quedar fuera)"
+    )
+    return dentro
+
+
+def cargar_caminos_a_neo4j(uri, user, password, gdf: gpd.GeoDataFrame):
+    driver = get_driver(uri, user, password)
+    registros = []
+    for _, row in gdf.iterrows():
+        registros.append(
+            {
+                "id": row["camino_id"],
+                "tipo": row["tipo"],
+                "geometria_wkt": row["geometry"].wkt,
+            }
+        )
+
+    with driver.session() as session:
+        for lote in chunks(registros, BATCH_SIZE):
+            session.run(
+                """
+                UNWIND $batch AS row
+                MERGE (c:Camino {id: row.id})
+                SET c.tipo = row.tipo, c.geometria_wkt = row.geometria_wkt
+                """,
+                batch=lote,
+            )
+    driver.close()
+    print(f"{len(registros)} caminos cargados como nodos Camino.")
+
+
+def calcular_cercania_a_celdas(uri, user, password, gdf: gpd.GeoDataFrame, resolucion: int):
+    driver = get_driver(uri, user, password)
+
+    with driver.session() as session:
+        result = session.run(
+            "MATCH (c:CeldaH3 {resolucion: $res}) RETURN c.h3_id AS h3_id",
+            res=resolucion,
+        )
+        celdas = [r["h3_id"] for r in result]
+
+    print(f"Calculando distancia a caminos para {len(celdas)} celdas (resolución {resolucion}) ...")
+
+    def haversine_m(lat1, lon1, lat2, lon2):
+        R = 6371000
+        p1, p2 = math.radians(lat1), math.radians(lat2)
+        dphi = math.radians(lat2 - lat1)
+        dlambda = math.radians(lon2 - lon1)
+        a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlambda / 2) ** 2
+        return 2 * R * math.asin(math.sqrt(a))
+
+    registros = []
+    # Precalculamos el punto medio de cada camino para no calcularlo 400 veces por celda
+    caminos_puntos = []
+    for _, row in gdf.iterrows():
+        caminos_puntos.append(
+            (row["camino_id"], row["geometry"].interpolate(0.5, normalized=True))
+        )
+
+    for h3_id in celdas:
+        lat, lon = h3.cell_to_latlng(h3_id)
+        dist_min, camino_id_cercano = min(
+            (haversine_m(lat, lon, pt.y, pt.x), camino_id)
+            for camino_id, pt in caminos_puntos
+        )
+        registros.append({
+            "h3_id": h3_id,
+            "resolucion": resolucion,
+            "camino_id": camino_id_cercano,
+            "distancia_m": dist_min,
+        })
+
+    with driver.session() as session:
+        for lote in chunks(registros, BATCH_SIZE):
+            session.run(
+                """
+                UNWIND $batch AS row
+                MATCH (c:CeldaH3 {h3_id: row.h3_id, resolucion: row.resolucion})
+                MATCH (cam:Camino {id: row.camino_id})
+                MERGE (c)-[r:CERCANA_A]->(cam)
+                SET r.distancia_m = row.distancia_m
+                """,
+                batch=lote,
+            )
+    driver.close()
+    print("Relaciones CERCANA_A creadas con el camino más próximo.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", required=True, help="Ruta al .shp o .geojson de caminos")
+    parser.add_argument(
+        "--geojson-blp",
+        required=True,
+        help="GeoJSON del límite del BLP (La_Primavera.geojson)",
+    )
+    parser.add_argument(
+        "--tipo",
+        default="interno",
+        choices=["interno", "vialidad"],
+        help="Solo se usa si el archivo NO trae columna 'highway'",
+    )
+    parser.add_argument("--uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687"))
+    parser.add_argument("--user", default=os.getenv("NEO4J_USER", "neo4j"))
+    parser.add_argument("--password", default=os.getenv("NEO4J_PASSWORD"))
+    parser.add_argument("--resolucion", type=int, default=8)
+    args = parser.parse_args()
+
+    print(f"Cargando polígono del BLP desde {args.geojson_blp} ...")
+    poligono = cargar_poligono_blp(args.geojson_blp)
+
+    gdf = cargar_caminos(args.input, args.tipo)
+    print(f"{len(gdf)} features leídas de {args.input}")
+
+    gdf = filtrar_dentro_del_poligono(gdf, poligono)
+    if len(gdf) == 0:
+        sys.exit("No quedó ningún camino 100% dentro del polígono. Nada que cargar.")
+
+    cargar_caminos_a_neo4j(args.uri, args.user, args.password, gdf)
+    calcular_cercania_a_celdas(args.uri, args.user, args.password, gdf, args.resolucion)
+
+
+if __name__ == "__main__":
+    main()

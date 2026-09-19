@@ -1,0 +1,21 @@
+# Secretos y credenciales
+.env
+
+# Entorno virtual
+venv/
+env/
+ENV/
+
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Datos crudos pesados (recomendable para no inflar Git)
+data/raw/
+
+# Configuraciones de editor y SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
