@@ -11,7 +11,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Datos crudos pesados (recomendable para no inflar Git)
+# Datos crudos
 data/raw/
 
 # Configuraciones de editor y SO

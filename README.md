@@ -9,7 +9,7 @@ grafo de especies para su consumo desde un frontend.
 ## Estructura principal
 
 ```text
-backend/   API FastAPI y endpoints del grafo
+backend/   API FastAPI y endpoints del grafo y las celdas H3
 data/      Datos crudos y límites GeoJSON
 etls/      Scripts de carga, grid H3 y clustering
 schema/    Constraints, índices y modelo de Neo4j
@@ -96,11 +96,18 @@ GET /health
 GET /grafo/especies
 GET /grafo/especies?incluir_aisladas=true
 GET /grafo/especies/resumen
+GET /celdas?resolucion=8
+GET /celdas?resolucion=9&bbox=-103.6,20.5,-103.4,20.8
 ```
 
 `/grafo/especies` devuelve nodos `Especie` y relaciones `COOCURRE_CON`,
 incluyendo color por `cluster_especies` y forma por reino taxonómico. Por
 defecto omite especies sin clúster; usa `incluir_aisladas=true` para incluirlas.
+
+`/celdas` devuelve las celdas H3 con sus vértices, resolución, total de
+observaciones, conteos por zona (`nucleo`, `zona_mab` y `fuera`), zona dominante
+y color. El parámetro opcional `bbox` usa el formato
+`west,south,east,north` en grados decimales para limitar los resultados.
 
 Pruebas rápidas desde otra terminal:
 
@@ -109,6 +116,8 @@ curl http://localhost:8000/health
 curl http://localhost:8000/grafo/especies
 curl "http://localhost:8000/grafo/especies?incluir_aisladas=true"
 curl http://localhost:8000/grafo/especies/resumen
+curl "http://localhost:8000/celdas?resolucion=8"
+curl "http://localhost:8000/celdas?resolucion=9&bbox=-103.6,20.5,-103.4,20.8"
 ```
 
 La respuesta de `/health` confirma que la API está activa y devuelve el total
