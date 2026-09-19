@@ -146,10 +146,9 @@ Al finalizar muestra el número de relaciones, especies, clusters y la
 modularidad calculada. En Neo4j Bloom, `cluster_especies` puede utilizarse como
 atributo de color o agrupación para visualizar las comunidades.
 
-## Institucion — carga manual sugerida para esta semana
+## Institucion — carga faltante - SOLICITAR INFORMACIÓN
 
-Con lo que ya sacamos del pizarrón, esto te da un punto de partida (ajusta
-`labor`/`descripcion` con lo real):
+Un ejemplo de como podría ser la carga es el siguiente:
 
 ```cypher
 UNWIND [
