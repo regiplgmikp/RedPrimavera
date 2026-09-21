@@ -1,5 +1,5 @@
 
-### RedPrimavera
+# RedPrimavera
 
 Proyecto de análisis espacial del Bosque La Primavera. Integra datos de
 observaciones de especies, celdas H3, caminos y redes de co-ocurrencia en
@@ -23,7 +23,7 @@ Desde la raíz del proyecto instala las dependencias:
 ```bash
 python -m venv venv
 venv\Scripts\activate
-python -m pip install pandas h3 neo4j geopandas shapely networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic
+python -m pip install pandas h3 neo4j geopandas shapely networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api
 ```
 
 En PowerShell, si la política de ejecución bloquea la activación, usa la
@@ -39,8 +39,26 @@ proyecto. No compartas este archivo ni subas la contraseña al repositorio:
 
 ```env
 NEO4J_URI=neo4j+s://TU_ID.databases.neo4j.io
-NEO4J_USER=neo4j
+NEO4J_USER=TU_USUARIO
 NEO4J_PASSWORD=TU_PASSWORD
+# Proyecto de Google Earth Engine, requerido por los ETL o scripts que consulten GEE
+GEE_PROJECT=TU_PROYECTO_GEE
+# Orígenes permitidos por la API, separados por comas (opcional)
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+```
+
+`NEO4J_USER` depende de la instancia configurada; en Aura puede ser un usuario
+distinto de `neo4j`. Mantén `.env` fuera del control de versiones y nunca
+publiques la contraseña ni las credenciales de Google Earth Engine.
+
+### Comprobar Google Earth Engine
+
+Si vas a ejecutar código que consulte Google Earth Engine, autentícate una vez
+con la cuenta o el proyecto configurado y verifica la conexión:
+
+```bash
+earthengine authenticate
+python -c "import ee, os; from dotenv import load_dotenv; load_dotenv(); ee.Initialize(project=os.environ['GEE_PROJECT']); print('Conexion exitosa a GEE')"
 ```
 
 ## Orden de ejecución
@@ -130,15 +148,15 @@ Neo4j.
 `etls/clustering_especies.py` agrupa las especies a partir de la red de
 co-ocurrencia espacial (`COOCURRE_CON`). Lee las relaciones desde Neo4j,
 construye el grafo en `networkx` y aplica el algoritmo de comunidades Louvain
-usando `r.peso` como peso de cada relación. El resultado se guarda en cada
-nodo `Especie` mediante la propiedad `cluster_especies`.
+incluido en `networkx`, usando `r.peso` como peso de cada relación. El resultado
+se guarda en cada nodo `Especie` mediante la propiedad `cluster_especies`.
 
 El script requiere que la red `COOCURRE_CON` ya exista en Neo4j. Lee las
 credenciales desde el archivo `.env`:
 
 ```env
 NEO4J_URI=neo4j+s://TU_ID.databases.neo4j.io
-NEO4J_USER=neo4j
+NEO4J_USER=TU_USUARIO
 NEO4J_PASSWORD=TU_PASSWORD
 ```
 
