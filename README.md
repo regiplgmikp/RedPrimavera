@@ -9,12 +9,41 @@ grafo de especies para su consumo desde un frontend.
 ## Estructura principal
 
 ```text
-backend/   API FastAPI y endpoints del grafo y las celdas H3
-data/      Datos crudos y límites GeoJSON
-etls/      Scripts de carga, grid H3 y clustering
-schema/    Constraints, índices y modelo de Neo4j
-utils/     Conexión compartida a Neo4j
+RedPrimavera/
+├── backend/
+│   ├── __init__.py
+│   ├── database.py              # Sesiones y driver de Neo4j para la API
+│   ├── main.py                  # Aplicación FastAPI y endpoint /health
+│   └── routers/
+│       ├── __init__.py
+│       ├── celdas.py             # Endpoint de celdas H3
+│       └── grafo.py              # Endpoints del grafo de especies
+├── data/
+│   ├── boundary/
+│   │   ├── AreaTransicion.geojson
+│   │   └── La_Primavera.geojson
+│   └── raw/
+│       ├── export.geojson
+│       └── observations_23082026.csv
+├── etls/
+│   ├── clustering_especies.py    # Comunidades Louvain en COOCURRE_CON
+│   ├── etl_caminos.py             # Caminos y relaciones CERCANA_A
+│   ├── etl_especies_obser.py      # Especies, observaciones y celdas H3
+│   ├── etl_gee_estructura.py      # Dosel y cobertura arbórea con GEE
+│   ├── etl_gee_ndvi.py             # NDVI por celda H3 con GEE
+│   └── generar_grid_h3.py          # Grid H3 completo y adyacencias
+├── schema/
+│   └── schema.cypher              # Constraints, índices y modelo de Neo4j
+├── utils/
+│   ├── __init__.py
+│   └── neo4j_conn.py              # Conexión compartida a Neo4j
+├── .env                           # Variables locales; no versionar
+├── .gitignore
+└── README.md
 ```
+
+La carpeta `venv/` puede existir localmente como entorno virtual, pero no forma
+parte del código fuente ni debe subirse al repositorio.
 
 ## Requisitos e instalación
 
@@ -86,14 +115,17 @@ python etls/etl_gee_ndvi.py \
   --fecha-inicio 2026-06-24 \
   --fecha-fin 2026-09-22
 
-# 5. (cuando tengas el shp o GeoJSON) cargar caminos
+# 5. Calcular estructura de vegetación por celda H3 con Google Earth Engine
+python etls/etl_gee_estructura.py --resolucion 9
+
+# 6. (cuando tengas el shp o GeoJSON) cargar caminos
 python etls/etl_caminos.py \
   --input ruta/a/caminos_internos.shp \
   --geojson-blp data/boundary/La_Primavera.geojson \
   --tipo interno \
   --resolucion 8
 
-# 6. Calcular clusters de especies por co-ocurrencia espacial
+# 7. Calcular clusters de especies por co-ocurrencia espacial
 python etls/clustering_especies.py
 ```
 
@@ -111,6 +143,13 @@ Ejemplo usando la ventana predeterminada de 90 días:
 ```bash
 python etls/etl_gee_ndvi.py --resolucion 9
 ```
+
+El ETL de estructura (`etls/etl_gee_estructura.py`) consulta Meta Canopy Height
+y ESA WorldCover en Google Earth Engine. Guarda en cada `CeldaH3` la altura
+promedio y máxima del dosel (`canopy_height_mean` y `canopy_height_max`), así
+como el porcentaje de cobertura arbórea (`cobertura_arbolada_pct`). Requiere
+que el grid H3 ya exista y usa `GEE_PROJECT` o `--proyecto` para seleccionar el
+proyecto de Google Earth Engine.
 
 ## API backend
 
@@ -201,8 +240,9 @@ SET i.tipo = row.tipo, i.labor = row.labor;
 La relación `ACTUA_SOBRE` (Institución→Observación, con el peso compuesto
 `0.2·dist_calle + 0.3·dist_arboles` del pizarrón) **no se carga todavía** —
 depende de que definan la fórmula completa y de tener `dist_calle` resuelto
-(necesita el shp de caminos) y `dist_arboles` (necesita canopy height vía GEE,
-que es la siguiente pieza del stack, no de esta semana).
+(necesita el shp de caminos) y `dist_arboles` (la variable de estructura ya se
+calcula por celda, pero todavía falta definir cómo convertirla en distancia a
+árboles y completar la fórmula).
 
 ## Verificación rápida post-carga
 
@@ -216,6 +256,16 @@ MATCH (c:CeldaH3 {resolucion: 8})-[r:ADYACENTE_A]->() RETURN count(r);
 MATCH (c:CeldaH3 {resolucion: 9})
 WHERE c.ndvi_actual IS NOT NULL
 RETURN count(c), min(c.ndvi_actual), max(c.ndvi_actual);
+
+// Celdas con variables de estructura calculadas
+MATCH (c:CeldaH3)
+WHERE c.canopy_height_mean IS NOT NULL
+RETURN c.resolucion AS resolucion,
+       count(c) AS total_celdas,
+       round(avg(c.canopy_height_mean), 2) AS altura_promedio_m,
+       round(max(c.canopy_height_max), 2) AS altura_maxima_m,
+       round(avg(c.cobertura_arbolada_pct), 2) AS cobertura_promedio_pct
+ORDER BY resolucion;
 
 // También puede usarse el siguiente para verificar NDVI
 MATCH (c:CeldaH3)
