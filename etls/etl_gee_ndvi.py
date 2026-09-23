@@ -1,6 +1,24 @@
-"""
-    Extracción satelital: NDVI (Sentinel-2) agregado por celda H3,
-    escrito de vuelta a Neo4j como CeldaH3.ndvi_actual.
+"""Calcula NDVI reciente de Sentinel-2 y lo guarda por celda H3 en Neo4j.
+
+Requisitos:
+        - Python con earthengine-api, h3, neo4j y python-dotenv instalados.
+        - Una cuenta de Google Earth Engine autenticada y un proyecto de Google
+            Cloud indicado por GEE_PROJECT o por --proyecto.
+        - Una instancia de Neo4j accesible con NEO4J_URI, NEO4J_USER y
+            NEO4J_PASSWORD en el entorno o en un archivo .env.
+        - Celdas CeldaH3 creadas previamente para la resolucion solicitada.
+
+Qué hace:
+        - Lee de Neo4j los H3 existentes en la resolucion indicada.
+        - Consulta Sentinel-2 SR Harmonized en Google Earth Engine, enmascara
+            sombras y nubes mediante SCL y calcula un composite mediano de NDVI.
+        - Obtiene el promedio de NDVI por celda y actualiza CeldaH3.ndvi_actual.
+
+Notas:
+        - Por defecto procesa los 90 dias anteriores a la fecha de ejecucion;
+            usa --fecha-inicio y --fecha-fin para definir otra ventana.
+        - Si no hay celdas para la resolucion, termina sin escribir cambios.
+        - Requiere conectividad con Google Earth Engine y Neo4j.
 """
 
 import argparse

@@ -1,24 +1,23 @@
-"""
-Genera la rejilla H3 COMPLETA sobre el polígono del BLP (todas las celdas
-que cubren el área protegida, tengan o no observaciones), y crea las
-relaciones ADYACENTE_A entre celdas vecinas dentro de la misma resolución.
-
-A diferencia de 02_etl_especies_observaciones.py (que solo crea CeldaH3 para
-celdas con al menos una observación), este script cubre el bosque completo
--necesario para que el grid se vea continuo en el mapa, no solo "islas"
-alrededor de los avistamientos.
+"""Genera el grid H3 completo del Bosque La Primavera y sus adyacencias.
 
 Requisitos:
-    pip install h3 neo4j --break-system-packages
+        - Python con h3, neo4j y python-dotenv instalados.
+        - Un GeoJSON de tipo Polygon o MultiPolygon con el limite del bosque.
+        - Una instancia de Neo4j accesible y NEO4J_URI, NEO4J_USER y
+            NEO4J_PASSWORD en el entorno o en un archivo .env.
 
-Uso:
-    python 04_generar_grid_h3.py \
-        --geojson La_Primavera.geojson \
-        --resoluciones 8 9 \
-        --uri bolt://localhost:7687 \
-        --user neo4j \
-        --password TU_PASSWORD
+Qué hace:
+        - Convierte el poligono a celdas H3 para cada resolucion solicitada,
+            incluyendo celdas que aun no tienen observaciones.
+        - Crea o actualiza nodos CeldaH3 y relaciones ADYACENTE_A entre vecinas
+            de la misma resolucion mediante operaciones por lotes.
 
+Notas:
+        - El GeoJSON usa coordenadas [longitud, latitud]; el script hace la
+            conversion al orden que necesita h3-py.
+        - Es idempotente mediante MERGE y puede ejecutarse despues del ETL de
+            observaciones para completar el grid sin perder datos existentes.
+        - Conviene ejecutarlo antes de etl_gee_ndvi.py y de cargar caminos.
 """
 
 import argparse

@@ -1,40 +1,26 @@
-"""
-ETL: carga catálogo de especies y observaciones (iNaturalist/Naturalista) a Neo4j.
+"""Carga especies y observaciones de iNaturalist/Naturalista en Neo4j.
 
-Requisitos (instalar en tu entorno, no en este sandbox sin red):
-    pip install pandas h3 neo4j --break-system-packages
-
-Uso:
-    python 02_etl_especies_observaciones.py \
-        --csv Observaciones_Naturalista/observations_23082026.csv \
-        --uri bolt://localhost:7687 \
-        --user neo4j \
-        --password TU_PASSWORD \
-        --resoluciones 8 9
+Requisitos:
+        - Python con pandas, h3, neo4j y python-dotenv instalados.
+        - Un CSV exportado de iNaturalist con sus columnas de observaciones.
+        - Una instancia de Neo4j accesible y NEO4J_URI, NEO4J_USER y
+            NEO4J_PASSWORD en el entorno o en un archivo .env.
+        - Los constraints de schema/schema.cypher creados previamente.
 
 Qué hace:
-    1. Lee el CSV exportado de Naturalista (formato estándar iNaturalist).
-    2. Para cada observación calcula la celda H3 contenedora en cada
-       resolución solicitada (por defecto 8 y 9), para soportar el
-       refinamiento dinámico del grid al hacer zoom en el frontend.
-    3. Crea/actualiza (MERGE) nodos Especie, Observacion y CeldaH3.
-    4. Crea las relaciones PERTENECE_A y UBICADA_EN (una por resolución).
-    5. Todo se hace por lotes (UNWIND) para no golpear la base con
-       miles de transacciones individuales.
+        - Limpia y filtra las observaciones con calidad "research".
+        - Clasifica cada observacion en nucleo, zona_mab o fuera cuando se
+            proporcionan los GeoJSON de las zonas.
+        - Calcula la celda H3 de cada observacion para las resoluciones solicitadas.
+        - Crea o actualiza nodos Especie, Observacion y CeldaH3, junto con las
+            relaciones PERTENECE_A y UBICADA_EN, usando cargas por lotes.
 
-Notas de mapeo:
-    - categoria: Plantae -> "flora", Fungi -> "hongos", resto -> "fauna".
-      Ajusta MAPA_CATEGORIA si tu criterio biológico es distinto.
-    - taxon_id queda como propiedad indexada (no como llave) de Especie,
-      útil para cruzar después contra el backbone taxonómico de GBIF
-      (NOM-059/IUCN) sin depender de coincidencias de texto en el nombre.
-      La llave primaria de Especie es nombre_cientifico, porque es el
-      identificador que se usa en la práctica para consultar (GBIF,
-      NOM-059, IUCN, revisión manual) y el que se necesita poder buscar
-      directamente, junto con nombre_comun.
-    - Solo se cargan filas con quality_grade == "research" si existen
-      otros grados en tu export; en el dataset revisado ya venían
-      pre-filtradas, pero el filtro se deja explícito por seguridad.
+Notas:
+        - --geojson-blp y --geojson-mab son opcionales; sin ellos no se asigna
+            la zona espacial completa.
+        - nombre_cientifico identifica a cada Especie y taxon_id queda como
+            propiedad para cruces posteriores con catalogos taxonomicos.
+        - Es idempotente para los identificadores existentes porque usa MERGE.
 """
 import argparse
 import json

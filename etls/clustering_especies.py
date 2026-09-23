@@ -1,15 +1,23 @@
-"""
-Clustering de especies por co-ocurrencia espacial (red COOCURRE_CON), corrido
-localmente con networkx en vez de Aura Graph Analytics (hubo problemás pues aura desactivaba la opción automáticamente, por ello
-se recurruó a esto).
+"""Calcula comunidades de especies a partir de la red COOCURRE_CON.
 
-Requisitos (en tu venv, ya deberías tener neo4j instalado; falta networkx):
-    pip install networkx
+Requisitos:
+        - Python con networkx, neo4j y python-dotenv instalados.
+        - Una instancia de Neo4j accesible y NEO4J_URI, NEO4J_USER y
+            NEO4J_PASSWORD en el entorno o en un archivo .env.
+        - La red COOCURRE_CON creada previamente por el proceso de carga de
+            observaciones o por otro ETL.
 
-Uso:
-    python clustering_especies.py \
-        --uri neo4j+s://e75ace21.databases.neo4j.io \
-        --password TU_PASSWORD
+Qué hace:
+        - Lee las relaciones de co-ocurrencia y sus pesos desde Neo4j.
+        - Construye un grafo no dirigido en memoria y aplica Louvain con semilla
+            fija para obtener resultados reproducibles.
+        - Guarda el identificador de comunidad en Especie.cluster_especies y
+            muestra el numero de comunidades y la modularidad calculada.
+
+Notas:
+        - El calculo se realiza localmente con networkx; no requiere Aura Graph
+            Analytics.
+        - Debe ejecutarse despues de cargar o actualizar COOCURRE_CON.
 """
 
 import argparse

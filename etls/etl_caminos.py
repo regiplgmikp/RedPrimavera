@@ -1,3 +1,27 @@
+"""Carga caminos geoespaciales y calcula su cercania a celdas H3 en Neo4j.
+
+Requisitos:
+        - Python con geopandas, shapely, h3, neo4j y python-dotenv instalados.
+        - Un archivo de caminos .shp o .geojson legible por GeoPandas.
+        - El GeoJSON del limite del Bosque La Primavera.
+        - Una instancia de Neo4j accesible y NEO4J_URI, NEO4J_USER y
+            NEO4J_PASSWORD en el entorno o en un archivo .env.
+        - El grid H3 de la resolucion seleccionada creado previamente.
+
+Qué hace:
+        - Normaliza los caminos a EPSG:4326 y conserva solo los que quedan
+            completamente dentro del poligono del bosque.
+        - Clasifica los caminos usando la columna highway cuando existe; si no,
+            aplica el valor de --tipo.
+        - Crea o actualiza nodos Camino y relaciones CERCANA_A desde cada celda
+            H3 al camino mas proximo, guardando la distancia en metros.
+
+Notas:
+        - Los caminos que cruzan el borde o quedan fuera del poligono se descartan.
+        - --tipo solo aplica cuando el archivo no contiene la columna highway.
+        - Si el archivo no tiene CRS, se asume EPSG:4326.
+"""
+
 import argparse
 import json
 import math
