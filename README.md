@@ -80,19 +80,37 @@ python etls/generar_grid_h3.py \
   --geojson data/boundary/La_Primavera.geojson \
   --resoluciones 8 9
 
-# 4. (cuando tengas el shp o GeoJSON) cargar caminos
+# 4. Calcular NDVI reciente por celda H3 con Sentinel-2
+python etls/etl_gee_ndvi.py \
+  --resolucion 9 \
+  --fecha-inicio 2026-06-24 \
+  --fecha-fin 2026-09-22
+
+# 5. (cuando tengas el shp o GeoJSON) cargar caminos
 python etls/etl_caminos.py \
   --input ruta/a/caminos_internos.shp \
   --geojson-blp data/boundary/La_Primavera.geojson \
   --tipo interno \
   --resolucion 8
 
-# 5. Calcular clusters de especies por co-ocurrencia espacial
+# 6. Calcular clusters de especies por co-ocurrencia espacial
 python etls/clustering_especies.py
 ```
 
 Los ETL leen `NEO4J_URI`, `NEO4J_USER` y `NEO4J_PASSWORD` desde `.env`, por lo
 que no es necesario pasarlos como argumentos si el archivo está configurado.
+
+El ETL de NDVI debe ejecutarse después de generar el grid H3. Consulta
+Sentinel-2 SR Harmonized en Google Earth Engine, aplica una máscara de nubes y
+guarda el promedio por celda en la propiedad `CeldaH3.ndvi_actual`. Si no se
+indican fechas, usa los 90 días anteriores a la fecha de ejecución. El proyecto
+de GEE puede pasarse con `--proyecto` o mediante `GEE_PROJECT`.
+
+Ejemplo usando la ventana predeterminada de 90 días:
+
+```bash
+python etls/etl_gee_ndvi.py --resolucion 9
+```
 
 ## API backend
 
@@ -193,6 +211,21 @@ MATCH (o:Observacion) RETURN count(o);                    // ~12,077
 MATCH (e:Especie) RETURN count(e);                        // ~1,909
 MATCH (c:CeldaH3 {resolucion: 8}) RETURN count(c);
 MATCH (c:CeldaH3 {resolucion: 8})-[r:ADYACENTE_A]->() RETURN count(r);
+
+// Celdas con NDVI calculado
+MATCH (c:CeldaH3 {resolucion: 9})
+WHERE c.ndvi_actual IS NOT NULL
+RETURN count(c), min(c.ndvi_actual), max(c.ndvi_actual);
+
+// También puede usarse el siguiente para verificar NDVI
+MATCH (c:CeldaH3)
+WHERE c.ndvi_actual IS NOT NULL
+RETURN c.resolucion AS resolucion,
+       count(c) AS total_celdas,
+       round(min(c.ndvi_actual), 3) AS ndvi_min,
+       round(avg(c.ndvi_actual), 3) AS ndvi_promedio,
+       round(max(c.ndvi_actual), 3) AS ndvi_max
+ORDER BY resolucion;
 
 // Top especies por número de observaciones
 MATCH (o:Observacion)-[:PERTENECE_A]->(e:Especie)
