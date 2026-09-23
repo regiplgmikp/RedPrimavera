@@ -5,6 +5,7 @@
 venv/
 env/
 ENV/
+cache/
 
 # Archivos compilados de Python
 __pycache__/

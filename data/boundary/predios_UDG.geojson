@@ -1,0 +1,95 @@
+{
+  "type": "FeatureCollection",
+  "name": "predios_udg",
+  "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "nombre": "Club Deportivo UdeG / Villa Primavera - Observatorio OARP",
+        "institucion": "Universidad de Guadalajara",
+        "siglas": "UDG",
+        "tipo": "Instalación Académica / Deportiva / Científica",
+        "stroke": "#9B111E",
+        "stroke-width": 2.5,
+        "stroke-opacity": 1.0,
+        "fill": "#E53E3E",
+        "fill-opacity": 0.55
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-103.61450, 20.77580],
+            [-103.60820, 20.77350],
+            [-103.60550, 20.78020],
+            [-103.61180, 20.78250],
+            [-103.61450, 20.77580]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 220712,
+      "properties": {
+        "uuid": "f1b93547-165f-47cc-b9af-6ab2feb8591d",
+        "slug": "centro-universitario-de-ciencias-biologicas-y-agropecuarias-cucba-udg-ja-mx-completo",
+        "name": "Centro Universitario de Ciencias Biológicas y Agropecuarias (CUCBA) UDG, JA, MX COMPLETO",
+        "display_name": "Centro Universitario de Ciencias Biológicas y Agropecuarias (CUCBA) UDG, JA, MX COMPLETO",
+        "place_type": 20,
+        "admin_level": null,
+        "bbox_area": 0.00009158181726,
+        "ancestor_place_ids": [97394, 220712],
+        "location": "20.7443571485,-103.5122393722",
+        "nombre": "Centro Universitario de Ciencias Biológicas y Agropecuarias (CUCBA) UDG",
+        "institucion": "Universidad de Guadalajara",
+        "siglas": "UDG",
+        "tipo": "Instalación Académica / Científica",
+        "stroke": "#9B111E",
+        "stroke-width": 2.5,
+        "stroke-opacity": 1.0,
+        "fill": "#E53E3E",
+        "fill-opacity": 0.55
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [-103.5100086, 20.7404887],
+              [-103.5092992, 20.7402303],
+              [-103.5087735, 20.7400798],
+              [-103.5085911, 20.7406455],
+              [-103.5084007, 20.7411798],
+              [-103.5082075, 20.7417341],
+              [-103.507934, 20.742708],
+              [-103.507537, 20.7441528],
+              [-103.5071803, 20.7453718],
+              [-103.5070301, 20.7458659],
+              [-103.506971, 20.7460265],
+              [-103.5082719, 20.7464554],
+              [-103.5102702, 20.7471176],
+              [-103.5120538, 20.7476945],
+              [-103.5134432, 20.7481535],
+              [-103.5144437, 20.748462],
+              [-103.5152027, 20.7487179],
+              [-103.5155032, 20.7488257],
+              [-103.5156051, 20.7483642],
+              [-103.515986, 20.7471778],
+              [-103.5163132, 20.7459813],
+              [-103.5166163, 20.7448601],
+              [-103.5174209, 20.741889],
+              [-103.5174424, 20.7417184],
+              [-103.5142774, 20.7417385],
+              [-103.513462, 20.7415077],
+              [-103.5132045, 20.7415378],
+              [-103.5123462, 20.7412468],
+              [-103.5100086, 20.7404887]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
