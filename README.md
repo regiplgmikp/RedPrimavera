@@ -1,10 +1,10 @@
 
 # RedPrimavera
 
-Proyecto de análisis espacial del Bosque La Primavera. Integra datos de
-observaciones de especies, celdas H3, caminos y redes de co-ocurrencia en
-Neo4j. Los ETL cargan y transforman los datos, mientras que la API expone el
-grafo de especies para su consumo desde un frontend.
+Proyecto de análisis espacial del Bosque La Primavera. Integra observaciones
+de especies, celdas H3, caminos, variables de vegetación y redes de
+co-ocurrencia en Neo4j. Los ETL cargan y transforman los datos, mientras que
+la API FastAPI expone el grafo de especies y las celdas para un frontend.
 
 ## Estructura principal
 
@@ -21,16 +21,22 @@ RedPrimavera/
 ├── data/
 │   ├── boundary/
 │   │   ├── AreaTransicion.geojson
-│   │   └── La_Primavera.geojson
+│   │   ├── arroyo_lasTortugas.geojson
+│   │   ├── La_Primavera.geojson
+│   │   ├── municipios_primavera.geojson
+│   │   ├── predios_iteso.geojson
+│   │   └── predios_UDG.geojson
 │   └── raw/
 │       ├── export.geojson
 │       └── observations_23082026.csv
+├── cache/                         # Caché local; ignorada por Git
 ├── etls/
 │   ├── clustering_especies.py    # Comunidades Louvain en COOCURRE_CON
 │   ├── etl_caminos.py             # Caminos y relaciones CERCANA_A
 │   ├── etl_especies_obser.py      # Especies, observaciones y celdas H3
 │   ├── etl_gee_estructura.py      # Dosel y cobertura arbórea con GEE
 │   ├── etl_gee_ndvi.py             # NDVI por celda H3 con GEE
+│   ├── descargar_vectores_gobernanza.py # Descarga vectores de gobernanza
 │   └── generar_grid_h3.py          # Grid H3 completo y adyacencias
 ├── schema/
 │   └── schema.cypher              # Constraints, índices y modelo de Neo4j
@@ -45,13 +51,18 @@ RedPrimavera/
 La carpeta `venv/` puede existir localmente como entorno virtual, pero no forma
 parte del código fuente ni debe subirse al repositorio.
 
+Los archivos en `data/raw/`, `cache/`, `.env` y `venv/` están excluidos por
+`.gitignore`. Los GeoJSON de `data/boundary/` sí forman parte de los insumos
+locales del proyecto; verifica su disponibilidad antes de ejecutar un ETL.
+
 ## Requisitos e instalación
 
-Desde la raíz del proyecto instala las dependencias:
+Desde la raíz del proyecto crea el entorno e instala las dependencias:
 
 ```bash
 python -m venv venv
 venv\Scripts\activate
+python -m pip install --upgrade pip
 python -m pip install pandas h3 neo4j geopandas shapely networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api
 ```
 
@@ -61,6 +72,12 @@ sesión actual de la terminal:
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 .\venv\Scripts\Activate.ps1
+```
+
+En Linux o macOS activa el entorno con:
+
+```bash
+source venv/bin/activate
 ```
 
 Configura las credenciales de Neo4j en un archivo `.env` en la raíz del
@@ -91,6 +108,10 @@ python -c "import ee, os; from dotenv import load_dotenv; load_dotenv(); ee.Init
 ```
 
 ## Orden de ejecución
+
+Ejecuta los comandos desde la raíz del repositorio. El orden recomendado es el
+siguiente; cada ETL es idempotente para los identificadores que carga porque
+usa `MERGE` en Neo4j.
 
 ```bash
 
@@ -128,6 +149,21 @@ python etls/etl_caminos.py \
 # 7. Calcular clusters de especies por co-ocurrencia espacial
 python etls/clustering_especies.py
 ```
+
+Para consultar las opciones disponibles de cualquier ETL:
+
+```bash
+python etls/etl_especies_obser.py --help
+python etls/generar_grid_h3.py --help
+python etls/etl_gee_ndvi.py --help
+python etls/etl_gee_estructura.py --help
+python etls/etl_caminos.py --help
+python etls/clustering_especies.py --help
+```
+
+El script `etls/descargar_vectores_gobernanza.py` es auxiliar para obtener
+insumos vectoriales; revisa el código y sus fuentes antes de incorporarlos al
+flujo principal.
 
 Los ETL leen `NEO4J_URI`, `NEO4J_USER` y `NEO4J_PASSWORD` desde `.env`, por lo
 que no es necesario pasarlos como argumentos si el archivo está configurado.
@@ -199,6 +235,21 @@ La respuesta de `/health` confirma que la API está activa y devuelve el total
 de nodos consultado en Neo4j. Si la API no inicia, verifica que el comando se
 ejecute desde la raíz del proyecto y que `.env` contenga las variables de
 Neo4j.
+
+### Solución de problemas
+
+- `KeyError: NEO4J_URI` o `KeyError: NEO4J_PASSWORD`: falta una variable en
+  `.env` o el archivo no está en la raíz del repositorio.
+- Error de conexión con Neo4j: comprueba que la instancia esté disponible, que
+  el URI use el esquema correcto (`neo4j+s://` o el indicado por tu proveedor)
+  y que las credenciales sean válidas.
+- Error de Earth Engine: ejecuta `earthengine authenticate`, configura
+  `GEE_PROJECT` y confirma que el proyecto tenga habilitada la API.
+- La API devuelve cero celdas: ejecuta primero `generar_grid_h3.py` para la
+  resolución consultada.
+- El backend debe iniciarse con `python -m uvicorn backend.main:app --reload`
+  desde la raíz; ejecutar Uvicorn dentro de `backend/` rompe la importación de
+  `utils`.
 
 ## ETL de clustering de especies
 
