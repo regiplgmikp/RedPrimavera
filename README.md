@@ -6,18 +6,18 @@ de especies, celdas H3, caminos, variables de vegetación y redes de
 co-ocurrencia en Neo4j. Los ETL cargan y transforman los datos, mientras que
 la API FastAPI expone el grafo de especies y las celdas para un frontend.
 
-## Estructura principal
+## Estructura actual
 
 ```text
 RedPrimavera/
 ├── backend/
 │   ├── __init__.py
-│   ├── database.py              # Sesiones y driver de Neo4j para la API
-│   ├── main.py                  # Aplicación FastAPI y endpoint /health
+│   ├── database.py              # Driver singleton y sesión de Neo4j
+│   ├── main.py                  # Aplicación FastAPI + /health + CORS
 │   └── routers/
 │       ├── __init__.py
-│       ├── celdas.py             # Endpoint de celdas H3
-│       └── grafo.py              # Endpoints del grafo de especies
+│       ├── celdas.py             # GET /celdas
+│       └── grafo.py              # GET /grafo/especies y /grafo/especies/resumen
 ├── data/
 │   ├── boundary/
 │   │   ├── AreaTransicion.geojson
@@ -27,37 +27,41 @@ RedPrimavera/
 │   │   ├── predios_iteso.geojson
 │   │   └── predios_UDG.geojson
 │   └── raw/
-│       ├── export.geojson
-│       └── observations_23082026.csv
-├── cache/                         # Caché local; ignorada por Git
+│       ├── observations_23082026.csv
+│       └── PrediosUniversitariosCompletosUTM.*
+├── cache/                         # archivos locales generados por ETL / caché
 ├── etls/
-│   ├── clustering_especies.py    # Comunidades Louvain en COOCURRE_CON
-│   ├── etl_caminos.py             # Caminos y relaciones CERCANA_A
-│   ├── etl_especies_obser.py      # Especies, observaciones y celdas H3
-│   ├── etl_gee_estructura.py      # Dosel y cobertura arbórea con GEE
-│   ├── etl_gee_ndvi.py             # NDVI por celda H3 con GEE
-│   ├── descargar_vectores_gobernanza.py # Descarga vectores de gobernanza
-│   └── generar_grid_h3.py          # Grid H3 completo y adyacencias
+│   ├── clustering_especies.py     # Louvain sobre COOCURRE_CON
+│   ├── descargar_vectores_gobernanza.py
+│   ├── etl_caminos.py             # carga de caminos y relaciones CERCANA_A
+│   ├── etl_especies_obser.py      # especies, observaciones y celdas H3
+│   ├── etl_gee_estructura.py      # Meta Canopy Height + ESA WorldCover
+│   ├── etl_gee_ndvi.py            # NDVI desde Sentinel-2 SR Harmonized
+│   ├── etl_instituciones.py       # predios/instituciones y relación con celdas
+│   └── generar_grid_h3.py         # grid H3 completo y ADYACENTE_A
 ├── schema/
-│   └── schema.cypher              # Constraints, índices y modelo de Neo4j
+│   └── schema.cypher              # constraints, índices y modelo del grafo
+├── tests/
+│   ├── contar_cruces.py
+│   └── probar_conexion.py
 ├── utils/
 │   ├── __init__.py
-│   └── neo4j_conn.py              # Conexión compartida a Neo4j
-├── .env                           # Variables locales; no versionar
+│   └── neo4j_conn.py              # conexión a Neo4j con manejo de certificados
+├── .env                           # credenciales locales (no versionar)
 ├── .gitignore
-└── README.md
+├── README.md
+└── venv/                          # entorno virtual local (no versionar)
 ```
 
 La carpeta `venv/` puede existir localmente como entorno virtual, pero no forma
-parte del código fuente ni debe subirse al repositorio.
+parte del repositorio. Los archivos en `data/raw/`, `cache/`, `.env` y `venv/`
+se excluyen por `.gitignore`.
 
-Los archivos en `data/raw/`, `cache/`, `.env` y `venv/` están excluidos por
-`.gitignore`. Los GeoJSON de `data/boundary/` sí forman parte de los insumos
-locales del proyecto; verifica su disponibilidad antes de ejecutar un ETL.
+## Requisitos
 
-## Requisitos e instalación
+Se requiere Python 3.10+ y una instancia de Neo4j accesible.
 
-Desde la raíz del proyecto crea el entorno e instala las dependencias:
+### Dependencias principales
 
 ```bash
 python -m venv venv
@@ -66,22 +70,23 @@ python -m pip install --upgrade pip
 python -m pip install pandas h3 neo4j geopandas shapely networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api
 ```
 
-En PowerShell, si la política de ejecución bloquea la activación, usa la
-sesión actual de la terminal:
+Si PowerShell bloquea la activación del entorno virtual:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 .\venv\Scripts\Activate.ps1
 ```
 
-En Linux o macOS activa el entorno con:
+En Linux/macOS:
 
 ```bash
 source venv/bin/activate
 ```
 
-Configura las credenciales de Neo4j en un archivo `.env` en la raíz del
-proyecto. No compartas este archivo ni subas la contraseña al repositorio:
+## Variables de entorno
+
+Crea un archivo `.env` en la raíz del proyecto con tus credenciales locales.
+Nunca subas este archivo ni publiques la contraseña.
 
 ```env
 NEO4J_URI=neo4j+s://TU_ID.databases.neo4j.io
@@ -93,11 +98,12 @@ GEE_PROJECT=TU_PROYECTO_GEE
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 ```
 
-`NEO4J_USER` depende de la instancia configurada; en Aura puede ser un usuario
-distinto de `neo4j`. Mantén `.env` fuera del control de versiones y nunca
-publiques la contraseña ni las credenciales de Google Earth Engine.
+Notas:
+- `NEO4J_USER` puede variar según la instancia de Neo4j/Aura.
+- `GEE_PROJECT` solo es necesario para los ETL que usan Google Earth Engine.
+- `CORS_ORIGINS` es opcional pero se usa por la API FastAPI.
 
-### Comprobar Google Earth Engine
+## Verificación de Earth Engine
 
 Si vas a ejecutar código que consulte Google Earth Engine, autentícate una vez
 con la cuenta o el proyecto configurado y verifica la conexión:
@@ -107,50 +113,106 @@ earthengine authenticate
 python -c "import ee, os; from dotenv import load_dotenv; load_dotenv(); ee.Initialize(project=os.environ['GEE_PROJECT']); print('Conexion exitosa a GEE')"
 ```
 
-## Orden de ejecución
+## Modelo de datos y esquema
 
-Ejecuta los comandos desde la raíz del repositorio. El orden recomendado es el
-siguiente; cada ETL es idempotente para los identificadores que carga porque
-usa `MERGE` en Neo4j.
+El esquema de Neo4j se define en [schema/schema.cypher](schema/schema.cypher).
+Incluye nodos como:
+- `CeldaH3`
+- `Observacion`
+- `Especie`
+- `Camino`
+- `Predio`
+- `Institucion`
+- `EventoDisturbio`
+
+Y relaciones clave como:
+- `(:Especie)-[:COOCURRE_CON]-(:Especie)`
+- `(:Observacion)-[:PERTENECE_A]->(:Especie)`
+- `(:Observacion)-[:UBICADA_EN]->(:CeldaH3)`
+- `(:CeldaH3)-[:ADYACENTE_A]->(:CeldaH3)`
+- `(:CeldaH3)-[:CERCANA_A]->(:Camino)`
+- `(:CeldaH3)-[:DENTRO_DE]->(:Predio)`
+
+## Orden de ejecución recomendado
+
+Los scripts usan `MERGE` en Neo4j y son idempotentes para los identificadores que
+ya existen. Se recomienda ejecutar desde la raíz del proyecto.
+
+### 1) Crear constraints e índices
 
 ```bash
-
-# 1. Crear constraints e índices (una vez, en Neo4j Browser o cypher-shell)
 cypher-shell -u neo4j -p TU_PASSWORD -f schema/schema.cypher
+```
 
-# 2. Cargar especies + observaciones (con clasificación en 3 zonas)
+### 2) Cargar observaciones y especies
+
+El ETL principal de observaciones clasifica cada punto en las zonas `nucleo`,
+`zona_mab` y `fuera` cuando se le pasan los GeoJSON correspondientes.
+
+```bash
 python etls/etl_especies_obser.py \
   --csv data/raw/observations_23082026.csv \
   --geojson-blp data/boundary/La_Primavera.geojson \
   --geojson-mab data/boundary/AreaTransicion.geojson \
   --resoluciones 8 9
+```
 
-# 3. Generar el grid H3 del área de estudio
+### 3) Generar el grid H3 del área de estudio
+
+```bash
 python etls/generar_grid_h3.py \
   --geojson data/boundary/La_Primavera.geojson \
   --resoluciones 8 9
+```
 
-# 4. Calcular NDVI reciente por celda H3 con Sentinel-2
+### 4) Generar NDVI por celda H3 con Google Earth Engine
+
+```bash
+python etls/etl_gee_ndvi.py --resolucion 9
+```
+
+También acepta:
+
+```bash
 python etls/etl_gee_ndvi.py \
   --resolucion 9 \
   --fecha-inicio 2026-06-24 \
-  --fecha-fin 2026-09-22
+  --fecha-fin 2026-09-22 \
+  --proyecto TU_PROYECTO_GEE
+```
 
-# 5. Calcular estructura de vegetación por celda H3 con Google Earth Engine
+Este script actualiza la propiedad `CeldaH3.ndvi_actual`.
+
+### 5) Calcular estructura de vegetación por celda H3
+
+```bash
 python etls/etl_gee_estructura.py --resolucion 9
+```
 
-# 6. (cuando tengas el shp o GeoJSON) cargar caminos
+Escribe en cada celda:
+- `canopy_height_mean`
+- `canopy_height_max`
+- `cobertura_arbolada_pct`
+
+### 6) Cargar caminos (si se cuenta con el shapefile o GeoJSON)
+
+```bash
 python etls/etl_caminos.py \
   --input ruta/a/caminos_internos.shp \
   --geojson-blp data/boundary/La_Primavera.geojson \
   --tipo interno \
   --resolucion 8
+```
 
-# 7. Calcular clusters de especies por co-ocurrencia espacial
+### 7) Calcular comunidades de especies por co-ocurrencia
+
+```bash
 python etls/clustering_especies.py
 ```
 
-Para consultar las opciones disponibles de cualquier ETL:
+Esto usa Louvain en `networkx` y escribe `Especie.cluster_especies`.
+
+## Comandos útiles para explorar opciones
 
 ```bash
 python etls/etl_especies_obser.py --help
@@ -161,46 +223,20 @@ python etls/etl_caminos.py --help
 python etls/clustering_especies.py --help
 ```
 
-El script `etls/descargar_vectores_gobernanza.py` es auxiliar para obtener
-insumos vectoriales; revisa el código y sus fuentes antes de incorporarlos al
-flujo principal.
-
-Los ETL leen `NEO4J_URI`, `NEO4J_USER` y `NEO4J_PASSWORD` desde `.env`, por lo
-que no es necesario pasarlos como argumentos si el archivo está configurado.
-
-El ETL de NDVI debe ejecutarse después de generar el grid H3. Consulta
-Sentinel-2 SR Harmonized en Google Earth Engine, aplica una máscara de nubes y
-guarda el promedio por celda en la propiedad `CeldaH3.ndvi_actual`. Si no se
-indican fechas, usa los 90 días anteriores a la fecha de ejecución. El proyecto
-de GEE puede pasarse con `--proyecto` o mediante `GEE_PROJECT`.
-
-Ejemplo usando la ventana predeterminada de 90 días:
-
-```bash
-python etls/etl_gee_ndvi.py --resolucion 9
-```
-
-El ETL de estructura (`etls/etl_gee_estructura.py`) consulta Meta Canopy Height
-y ESA WorldCover en Google Earth Engine. Guarda en cada `CeldaH3` la altura
-promedio y máxima del dosel (`canopy_height_mean` y `canopy_height_max`), así
-como el porcentaje de cobertura arbórea (`cobertura_arbolada_pct`). Requiere
-que el grid H3 ya exista y usa `GEE_PROJECT` o `--proyecto` para seleccionar el
-proyecto de Google Earth Engine.
-
 ## API backend
 
-El backend está construido con FastAPI y debe ejecutarse desde la raíz del
-proyecto para encontrar el paquete `utils` y el archivo `.env`:
+El backend está implementado con FastAPI y se debe ejecutar desde la raíz del
+proyecto para que encuentre `utils` y `.env`.
 
 ```bash
 python -m uvicorn backend.main:app --reload
 ```
 
-La API queda disponible en [http://localhost:8000](http://localhost:8000).
-La documentación interactiva de Swagger se encuentra en
-[http://localhost:8000/docs](http://localhost:8000/docs).
+La API estará disponible en:
+- http://localhost:8000
+- Swagger docs: http://localhost:8000/docs
 
-Endpoints principales:
+### Endpoints implementados
 
 ```text
 GET /health
@@ -211,16 +247,18 @@ GET /celdas?resolucion=8
 GET /celdas?resolucion=9&bbox=-103.6,20.5,-103.4,20.8
 ```
 
-`/grafo/especies` devuelve nodos `Especie` y relaciones `COOCURRE_CON`,
-incluyendo color por `cluster_especies` y forma por reino taxonómico. Por
-defecto omite especies sin clúster; usa `incluir_aisladas=true` para incluirlas.
+### Descripción de los endpoints
 
-`/celdas` devuelve las celdas H3 con sus vértices, resolución, total de
-observaciones, conteos por zona (`nucleo`, `zona_mab` y `fuera`), zona dominante
-y color. El parámetro opcional `bbox` usa el formato
-`west,south,east,north` en grados decimales para limitar los resultados.
+- `/health`: confirma que la API responde y que puede consultar Neo4j.
+  Devuelve `status` y `nodos_en_base`.
+- `/grafo/especies`: devuelve nodos `Especie` y aristas `COOCURRE_CON` con
+  color por `cluster_especies` y forma según el reino.
+- `/grafo/especies?incluir_aisladas=true`: incluye especies sin clúster.
+- `/grafo/especies/resumen`: cuenta especies por clúster para uso visual.
+- `/celdas`: devuelve celdas H3 con su `boundary`, resolución, conteo por zona y
+  color dominante. El parámetro `bbox` acepta `west,south,east,north`.
 
-Pruebas rápidas desde otra terminal:
+### Pruebas rápidas
 
 ```bash
 curl http://localhost:8000/health
@@ -231,23 +269,46 @@ curl "http://localhost:8000/celdas?resolucion=8"
 curl "http://localhost:8000/celdas?resolucion=9&bbox=-103.6,20.5,-103.4,20.8"
 ```
 
-La respuesta de `/health` confirma que la API está activa y devuelve el total
-de nodos consultado en Neo4j. Si la API no inicia, verifica que el comando se
-ejecute desde la raíz del proyecto y que `.env` contenga las variables de
-Neo4j.
-
-### Solución de problemas
+## Solución de problemas comunes
 
 - `KeyError: NEO4J_URI` o `KeyError: NEO4J_PASSWORD`: falta una variable en
-  `.env` o el archivo no está en la raíz del repositorio.
-- Error de conexión con Neo4j: comprueba que la instancia esté disponible, que
-  el URI use el esquema correcto (`neo4j+s://` o el indicado por tu proveedor)
-  y que las credenciales sean válidas.
-- Error de Earth Engine: ejecuta `earthengine authenticate`, configura
-  `GEE_PROJECT` y confirma que el proyecto tenga habilitada la API.
-- La API devuelve cero celdas: ejecuta primero `generar_grid_h3.py` para la
-  resolución consultada.
-- El backend debe iniciarse con `python -m uvicorn backend.main:app --reload`
+  `.env` o el archivo está en otra ubicación.
+- Error de conexión con Neo4j: revisa la dirección, el esquema (`neo4j://`,
+  `neo4j+s://`, etc.) y que la base se encuentre disponible.
+- Error con Earth Engine: ejecuta `earthengine authenticate` y asegúrate de que
+  `GEE_PROJECT` exista y esté habilitado en Google Cloud.
+- La API devuelve cero celdas: revisa que ya se haya corrido `generar_grid_h3.py`
+  para la resolución que consultas.
+- El backend debe ejecutarse con:
+
+```bash
+python -m uvicorn backend.main:app --reload
+```
+
+## Notas del repositorio
+
+- `utils/neo4j_conn.py` centraliza la conexión a Neo4j y manejar certificados
+  con `certifi`.
+- `backend/database.py` carga `.env` desde la raíz y expone una dependencia
+  `get_session()` para FastAPI.
+- Los scripts `etl_gee_ndvi.py` y `etl_gee_estructura.py` requieren que la
+  grilla H3 ya exista antes de calcular estadísticas zonales.
+- El archivo `schema/schema.cypher` debe ejecutarse antes de cargar datos si la
+  base está vacía.
+
+## Estado del proyecto
+
+El repositorio actual ya contiene la base para:
+
+- cargar observaciones y especies desde CSV
+- generar y consultar celdas H3
+- calcular NDVI y estructura del dosel mediante GEE
+- crear relaciones de co-ocurrencia espacial entre especies
+- consultar el grafo y la distribución espacial a través de FastAPI
+
+Si quieres continuar el desarrollo, el siguiente paso natural es conectar el
+frontend al backend para visualizar celdas, especies y grafo de co-ocurrencia en
+el mapa.
   desde la raíz; ejecutar Uvicorn dentro de `backend/` rompe la importación de
   `utils`.
 
@@ -272,7 +333,7 @@ Al finalizar muestra el número de relaciones, especies, clusters y la
 modularidad calculada. En Neo4j Bloom, `cluster_especies` puede utilizarse como
 atributo de color o agrupación para visualizar las comunidades.
 
-## Institucion — carga faltante - SOLICITAR INFORMACIÓN
+## Institucion — falta cargar info sobre como actuan. ya se tienen los predios
 
 Un ejemplo de como podría ser la carga es el siguiente:
 
