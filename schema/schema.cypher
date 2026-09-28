@@ -26,6 +26,7 @@
 //                  reino_iconico, estatus_conservacion, endemica)
 // Institucion     (nombre, tipo, labor, descripcion)
 // Camino          (id, tipo, geometria_wkt)
+// Predio          (id, area_ha, geometria_wkt)
 // EventoDisturbio (fecha, tipo, dnbr, area_ha, periodo_retorno)
 //
 // RELACIONES
@@ -35,6 +36,8 @@
 // (Institucion)-[:ACTUA_SOBRE {peso, dist_calle, dist_arboles, buffer_m}]->(Observacion)
 // (CeldaH3)-[:AFECTADO_POR {severidad}]->(EventoDisturbio)
 // (CeldaH3)-[:CERCANA_A {distancia_m}]->(Camino)
+// (Institucion)-[:PROPIETARIA_DE]->(Predio)
+// (CeldaH3)-[:DENTRO_DE]->(Predio)   -- celdas que intersectan el polígono del predio
 // (CeldaH3)-[:ADYACENTE_A {resolucion}]->(CeldaH3)
 // (Observacion)-[:TIENE_VULNERABILIDAD {exposicion, sensibilidad,
 //                capacidad_adaptativa, indice_compuesto}]->(CeldaH3)
@@ -55,6 +58,9 @@ FOR (i:Institucion) REQUIRE i.nombre IS UNIQUE;
 
 CREATE CONSTRAINT camino_id IF NOT EXISTS
 FOR (cam:Camino) REQUIRE cam.id IS UNIQUE;
+
+CREATE CONSTRAINT predio_id IF NOT EXISTS
+FOR (p:Predio) REQUIRE p.id IS UNIQUE;
 
 // --- Índices de consulta frecuente ---
 CREATE INDEX especie_taxon_id IF NOT EXISTS
