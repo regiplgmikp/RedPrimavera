@@ -52,7 +52,29 @@ def zona_dominante_y_color(n_nucleo: int, n_zona_mab: int, n_fuera: int):
     return dominante, COLOR_POR_ZONA[dominante]
 
 
-def dentro_de_bbox(lat: float, lon: float, bbox: tuple[float, float, float, float] | None) -> bool:
+def celdas_en_bbox(bbox: tuple[float, float, float, float], resolucion: int) -> set[str]:
+    if h3 is None:
+        raise RuntimeError("Falta instalar h3 en el backend: pip install h3")
+
+    west, south, east, north = bbox
+    ring_latlon = [(south, west), (south, east), (north, east), (north, west)]
+    poly = h3.LatLngPoly(ring_latlon)
+
+    if hasattr(h3, "polygon_to_cells_experimental"):
+        try:
+            return set(
+                h3.polygon_to_cells_experimental(
+                    poly, resolucion, contain="overlap"
+                )
+            )
+        except Exception:
+            pass
+    return set(h3.polygon_to_cells(poly, resolucion))
+
+
+def dentro_de_bbox(
+    lat: float, lon: float, bbox: tuple[float, float, float, float] | None
+) -> bool:
     if bbox is None:
         return True
     west, south, east, north = bbox

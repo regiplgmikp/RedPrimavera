@@ -24,7 +24,6 @@ Notas:
 
 import argparse
 import json
-import math
 import os
 import sys
 from pathlib import Path
@@ -44,7 +43,7 @@ except ImportError:
     sys.exit("Falta geopandas. Instala con: pip install geopandas")
 
 try:
-    from shapely.geometry import shape
+    from shapely.geometry import Point, shape
 except ImportError:
     sys.exit("Falta shapely. Instala con: pip install shapely")
 
@@ -56,6 +55,7 @@ except ImportError:
 
 BATCH_SIZE = 500
 TIPOS_INTERNO = {"path", "track", "footway", "bridleway", "steps"}
+CRS_METRICO_JALISCO = "EPSG:32613"
 
 
 def chunks(lista, tam):
@@ -133,6 +133,11 @@ def cargar_caminos_a_neo4j(uri, user, password, gdf: gpd.GeoDataFrame):
 
 
 def calcular_cercania_a_celdas(uri, user, password, gdf: gpd.GeoDataFrame, resolucion: int):
+    """
+    Se proyecta todo a un CRS métrico (UTM 13N) y se usa la distancia
+    real al punto más cercano de la geometría completa (sjoin_narest, que internamente
+    usa un índice espacial).
+    """
     driver = get_driver(uri, user, password)
 
     with driver.session() as session:
@@ -144,34 +149,33 @@ def calcular_cercania_a_celdas(uri, user, password, gdf: gpd.GeoDataFrame, resol
 
     print(f"Calculando distancia a caminos para {len(celdas)} celdas (resolución {resolucion}) ...")
 
-    def haversine_m(lat1, lon1, lat2, lon2):
-        R = 6371000
-        p1, p2 = math.radians(lat1), math.radians(lat2)
-        dphi = math.radians(lat2 - lat1)
-        dlambda = math.radians(lon2 - lon1)
-        a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlambda / 2) ** 2
-        return 2 * R * math.asin(math.sqrt(a))
+    puntos_celda = gpd.GeoDataFrame(
+        {"h3_id": celdas},
+        geometry=[
+            Point(lon, lat)
+            for lat, lon in (h3.cell_to_latlng(h3_id) for h3_id in celdas)
+        ],
+        crs="EPSG:4326",
+    ).to_crs(CRS_METRICO_JALISCO)
 
-    registros = []
-    # Precalculamos el punto medio de cada camino para no calcularlo 400 veces por celda
-    caminos_puntos = []
-    for _, row in gdf.iterrows():
-        caminos_puntos.append(
-            (row["camino_id"], row["geometry"].interpolate(0.5, normalized=True))
-        )
+    caminos_metrico = gdf[["camino_id", "geometry"]].to_crs(CRS_METRICO_JALISCO)
 
-    for h3_id in celdas:
-        lat, lon = h3.cell_to_latlng(h3_id)
-        dist_min, camino_id_cercano = min(
-            (haversine_m(lat, lon, pt.y, pt.x), camino_id)
-            for camino_id, pt in caminos_puntos
-        )
-        registros.append({
-            "h3_id": h3_id,
+    cercanos = gpd.sjoin_nearest(
+        puntos_celda, caminos_metrico, distance_col="distancia_m", how="left"
+    )
+    # Si dos caminos empatan en distancia, sjoin_nearest puede duplicar la
+    # fila de la celda; nos quedamos con una sola coincidencia por celda.
+    cercanos = cercanos.drop_duplicates(subset="h3_id", keep="first")
+
+    registros = [
+        {
+            "h3_id": row["h3_id"],
             "resolucion": resolucion,
-            "camino_id": camino_id_cercano,
-            "distancia_m": dist_min,
-        })
+            "camino_id": row["camino_id"],
+            "distancia_m": float(row["distancia_m"]),
+        }
+        for _, row in cercanos.iterrows()
+    ]
 
     with driver.session() as session:
         for lote in chunks(registros, BATCH_SIZE):

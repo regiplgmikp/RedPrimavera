@@ -1,18 +1,21 @@
-import ssl
+import os
 import certifi
 from neo4j import GraphDatabase
 
+os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+
 def get_driver(uri: str, user: str, password: str):
-    # Si la URL viene con neo4j+s:// o neo4j+ssc://, normalizamos a neo4j://
-    # para permitir inyectar el ssl_context de certifi sin ConfigurationError
-    base_uri = uri.replace("neo4j+s://", "neo4j://").replace("neo4j+ssc://", "neo4j://")
-    
-    if "databases.neo4j.io" in base_uri or uri.startswith("neo4j+s://"):
-        context = ssl.create_default_context(cafile=certifi.where())
-        return GraphDatabase.driver(
-            base_uri,
-            auth=(user, password),
-            ssl_context=context
-        )
-        
+    """Crea el driver de Neo4j respetando el esquema del URI tal cual viene
+    (neo4j+s://, neo4j+ssc://, neo4j://, bolt://, ...). No se reescribe ni
+    se inyecta configuración TLS manual: el propio esquema decide cifrado
+    y verificación de certificado.
+    """
     return GraphDatabase.driver(uri, auth=(user, password))
+
+def verificar_conexion(driver) -> None:
+    """Confirma que el driver realmente puede autenticar y hablar con Neo4j
+    (y, para neo4j+s:///neo4j+ssc://, que el TLS se negoció bien). Útil para
+    diagnosticar el error de certificados en vez de asumir que "conecta" ya
+    significa "está cifrado y verificado".
+    """
+    driver.verify_connectivity()
