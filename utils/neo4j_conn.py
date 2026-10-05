@@ -2,7 +2,7 @@ import os
 import certifi
 from neo4j import GraphDatabase
 
-os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 
 def get_driver(uri: str, user: str, password: str):
     """Crea el driver de Neo4j respetando el esquema del URI tal cual viene

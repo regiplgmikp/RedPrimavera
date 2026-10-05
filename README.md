@@ -1,76 +1,71 @@
-
 # RedPrimavera
 
-Proyecto de análisis espacial del Bosque La Primavera. Integra observaciones
-de especies, celdas H3, caminos, variables de vegetación y redes de
-co-ocurrencia en Neo4j. Los ETL cargan y transforman los datos, mientras que
-la API FastAPI expone el grafo de especies y las celdas para un frontend.
+RedPrimavera es un proyecto de análisis espacial y vulnerabilidad del Bosque
+La Primavera. Integra observaciones de biodiversidad, una malla H3, variables
+de vegetación, incendios, caminos, predios e instituciones en un grafo de
+Neo4j. Los procesos ETL preparan y cargan la información; una API FastAPI
+expone los datos para un frontend geoespacial.
 
-## Estructura actual
+> El repositorio contiene el backend y los ETL. No incluye un frontend.
+
+## Arquitectura
 
 ```text
 RedPrimavera/
 ├── backend/
-│   ├── __init__.py
-│   ├── database.py              # Driver singleton y sesión de Neo4j
-│   ├── main.py                  # Aplicación FastAPI + /health + CORS
+│   ├── main.py                  # Aplicación FastAPI y ciclo de vida
+│   ├── database.py              # Driver singleton y sesiones Neo4j
 │   └── routers/
-│       ├── __init__.py
-│       ├── celdas.py             # GET /celdas
-│       └── grafo.py              # GET /grafo/especies y /grafo/especies/resumen
+│       ├── celdas.py            # Celdas H3 y estadísticas por zona
+│       └── grafo.py             # Grafo de especies y clústeres
 ├── data/
-│   ├── boundary/
-│   │   ├── AreaTransicion.geojson
-│   │   ├── arroyo_lasTortugas.geojson
-│   │   ├── La_Primavera.geojson
-│   │   ├── municipios_primavera.geojson
-│   │   ├── predios_iteso.geojson
-│   │   └── predios_UDG.geojson
-│   └── raw/
-│       ├── observations_23082026.csv
-│       └── PrediosUniversitariosCompletosUTM.*
-├── cache/                         # archivos locales generados por ETL / caché
+│   ├── boundary/                # GeoJSON de límites y predios
+│   └── raw/                     # Insumos locales; ignorados por Git
 ├── etls/
-│   ├── clustering_especies.py     # Louvain sobre COOCURRE_CON
+│   ├── clustering_especies.py
 │   ├── descargar_vectores_gobernanza.py
-│   ├── etl_caminos.py             # carga de caminos y relaciones CERCANA_A
-│   ├── etl_especies_obser.py      # especies, observaciones y celdas H3
-│   ├── etl_gee_estructura.py      # Meta Canopy Height + ESA WorldCover
-│   ├── etl_gee_ndvi.py            # NDVI desde Sentinel-2 SR Harmonized
-│   ├── etl_instituciones.py       # predios/instituciones y relación con celdas
-│   └── generar_grid_h3.py         # grid H3 completo y ADYACENTE_A
+│   ├── etl_caminos.py
+│   ├── etl_especies_obser.py
+│   ├── etl_gee_estructura.py
+│   ├── etl_gee_incendios.py
+│   ├── etl_gee_ndvi.py
+│   ├── etl_instituciones.py
+│   └── generar_grid_h3.py
 ├── schema/
-│   └── schema.cypher              # constraints, índices y modelo del grafo
+│   └── schema.cypher             # Constraints, índices y modelo del grafo
 ├── tests/
 │   ├── contar_cruces.py
 │   └── probar_conexion.py
 ├── utils/
-│   ├── __init__.py
-│   └── neo4j_conn.py              # conexión a Neo4j con manejo de certificados
-├── .env                           # credenciales locales (no versionar)
-├── .gitignore
-├── README.md
-└── venv/                          # entorno virtual local (no versionar)
+│   └── neo4j_conn.py             # Conexión y verificación de Neo4j
+├── .env                          # Solo local; nunca versionar
+└── README.md
 ```
 
-La carpeta `venv/` puede existir localmente como entorno virtual, pero no forma
-parte del repositorio. Los archivos en `data/raw/`, `cache/`, `.env` y `venv/`
-se excluyen por `.gitignore`.
+`cache/`, `venv/`, `.env`, `data/raw/` y los archivos compilados de Python
+están excluidos por `.gitignore`.
 
 ## Requisitos
 
-Se requiere Python 3.10+ y una instancia de Neo4j accesible.
+- Python 3.10 o posterior.
+- Neo4j 5.x accesible desde el equipo.
+- Una cuenta y un proyecto de Google Earth Engine para los ETL de NDVI,
+  estructura e incendios.
+- Un archivo de observaciones en CSV (Naturalist/iNaturalist) y los insumos
+  geoespaciales que correspondan a cada ETL.
 
-### Dependencias principales
+### Crear el entorno e instalar dependencias
 
-```bash
+En Windows PowerShell:
+
+```powershell
 python -m venv venv
-venv\Scripts\activate
+.\venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install pandas h3 neo4j geopandas shapely networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api
+python -m pip install pandas geopandas shapely osmnx h3 neo4j networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api
 ```
 
-Si PowerShell bloquea la activación del entorno virtual:
+Si PowerShell impide activar el entorno:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
@@ -80,317 +75,279 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 En Linux/macOS:
 
 ```bash
+python3 -m venv venv
 source venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install pandas geopandas shapely osmnx h3 neo4j networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api
 ```
 
-## Variables de entorno
+## Configuración
 
-Crea un archivo `.env` en la raíz del proyecto con tus credenciales locales.
-Nunca subas este archivo ni publiques la contraseña.
+Crea `.env` en la raíz del proyecto. El archivo está ignorado por Git y debe
+contener valores locales, nunca credenciales escritas en el README.
 
 ```env
-NEO4J_URI=neo4j+s://TU_ID.databases.neo4j.io
+NEO4J_URI=neo4j+s://TU_INSTANCIA.databases.neo4j.io
 NEO4J_USER=TU_USUARIO
 NEO4J_PASSWORD=TU_PASSWORD
-# Proyecto de Google Earth Engine, requerido por los ETL o scripts que consulten GEE
 GEE_PROJECT=TU_PROYECTO_GEE
-# Orígenes permitidos por la API, separados por comas (opcional)
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 ```
 
-Notas:
-- `NEO4J_USER` puede variar según la instancia de Neo4j/Aura.
-- `GEE_PROJECT` solo es necesario para los ETL que usan Google Earth Engine.
-- `CORS_ORIGINS` es opcional pero se usa por la API FastAPI.
+`NEO4J_URI` conserva el esquema que indique la instancia (`neo4j+s://`,
+`neo4j+ssc://`, `neo4j://` o `bolt://`). `CORS_ORIGINS` es opcional y acepta
+orígenes separados por comas. Los scripts que usan Earth Engine leen
+`GEE_PROJECT` o permiten indicar el proyecto por línea de comandos.
 
-## Verificación de Earth Engine
+### Autenticar Google Earth Engine
 
-Si vas a ejecutar código que consulte Google Earth Engine, autentícate una vez
-con la cuenta o el proyecto configurado y verifica la conexión:
-
-```bash
+```powershell
 earthengine authenticate
 python -c "import ee, os; from dotenv import load_dotenv; load_dotenv(); ee.Initialize(project=os.environ['GEE_PROJECT']); print('Conexion exitosa a GEE')"
 ```
 
-## Modelo de datos y esquema
+## Modelo de datos
 
-El esquema de Neo4j se define en [schema/schema.cypher](schema/schema.cypher).
-Incluye nodos como:
-- `CeldaH3`
-- `Observacion`
-- `Especie`
-- `Camino`
-- `Predio`
-- `Institucion`
-- `EventoDisturbio`
+El modelo completo está en [schema/schema.cypher](schema/schema.cypher).
+Incluye, entre otros, los nodos:
 
-Y relaciones clave como:
-- `(:Especie)-[:COOCURRE_CON]-(:Especie)`
-- `(:Observacion)-[:PERTENECE_A]->(:Especie)`
-- `(:Observacion)-[:UBICADA_EN]->(:CeldaH3)`
-- `(:CeldaH3)-[:ADYACENTE_A]->(:CeldaH3)`
-- `(:CeldaH3)-[:CERCANA_A]->(:Camino)`
-- `(:CeldaH3)-[:DENTRO_DE]->(:Predio)`
+- `CeldaH3`: identificador H3, resolución, NDVI, estructura, exposición y
+  métricas de incendios.
+- `Observacion`: fecha, fuente, ubicación, categoría, zona y calidad.
+- `Especie`: taxonomía, reino, conservación y clúster de co-ocurrencia.
+- `Institucion`, `Predio`, `Camino` y `EventoDisturbio`.
 
-## Orden de ejecución recomendado
+Relaciones principales:
 
-Los scripts usan `MERGE` en Neo4j y son idempotentes para los identificadores que
-ya existen. Se recomienda ejecutar desde la raíz del proyecto.
+```text
+Observacion -[:PERTENECE_A]-> Especie
+Observacion -[:UBICADA_EN]-> CeldaH3
+Especie -[:COOCURRE_CON]- Especie
+CeldaH3 -[:ADYACENTE_A]-> CeldaH3
+CeldaH3 -[:CERCANA_A]-> Camino
+CeldaH3 -[:DENTRO_DE]-> Predio
+CeldaH3 -[:AFECTADO_POR]-> EventoDisturbio
+Institucion -[:PROPIETARIA_DE]-> Predio
+```
 
-### 1) Crear constraints e índices
+La clasificación espacial usada por las observaciones es `nucleo`,
+`zona_mab` y `fuera`.
 
-```bash
+## Flujo de carga recomendado
+
+Ejecuta los comandos desde la raíz del repositorio. Los ETL usan `MERGE` para
+los identificadores principales y pueden repetirse sin duplicar esos nodos.
+
+### 1. Crear constraints e índices
+
+```powershell
 cypher-shell -u neo4j -p TU_PASSWORD -f schema/schema.cypher
 ```
 
-### 2) Cargar observaciones y especies
+### 2. Preparar capas de referencia
 
-El ETL principal de observaciones clasifica cada punto en las zonas `nucleo`,
-`zona_mab` y `fuera` cuando se le pasan los GeoJSON correspondientes.
+Los GeoJSON actualmente disponibles están en `data/boundary/`. El script de
+gobernanza consulta OpenStreetMap mediante OSMnx y genera capas adicionales en
+`data/`:
 
-```bash
-python etls/etl_especies_obser.py \
-  --csv data/raw/observations_23082026.csv \
-  --geojson-blp data/boundary/La_Primavera.geojson \
-  --geojson-mab data/boundary/AreaTransicion.geojson \
+```powershell
+python etls/descargar_vectores_gobernanza.py
+```
+
+También se incluyen límites de `La_Primavera.geojson`, `AreaTransicion.geojson`,
+municipios, predios y el arroyo Las Tortugas.
+
+### 3. Cargar observaciones, especies y celdas asociadas
+
+```powershell
+python etls/etl_especies_obser.py `
+  --csv data/raw/observaciones.csv `
+  --geojson-blp data/boundary/La_Primavera.geojson `
+  --geojson-mab data/boundary/AreaTransicion.geojson `
   --resoluciones 8 9
 ```
 
-### 3) Generar el grid H3 del área de estudio
+El nombre y la ubicación del CSV dependen del insumo disponible. Consulta
+todas las opciones con:
 
-```bash
-python etls/generar_grid_h3.py \
-  --geojson data/boundary/La_Primavera.geojson \
+```powershell
+python etls/etl_especies_obser.py --help
+```
+
+### 4. Generar la malla H3 completa
+
+```powershell
+python etls/generar_grid_h3.py `
+  --geojson data/boundary/La_Primavera.geojson `
   --resoluciones 8 9
 ```
 
-### 4) Generar NDVI por celda H3 con Google Earth Engine
+Este paso crea `CeldaH3` aunque todavía no tengan observaciones y genera
+`ADYACENTE_A`. Se recomienda ejecutarlo antes de los ETL de Google Earth
+Engine.
 
-```bash
-python etls/etl_gee_ndvi.py --resolucion 9
+### 5. Cargar predios e instituciones
+
+```powershell
+python etls/etl_instituciones.py `
+  --shp data/raw/PrediosUniversitariosCompletosUTM.shp `
+  --resoluciones 8 9
 ```
 
-También acepta:
+Se puede usar `--dry-run` para revisar los predios sin escribir en Neo4j.
+El archivo debe conservar sus archivos auxiliares `.dbf`, `.prj` y `.shx`.
 
-```bash
-python etls/etl_gee_ndvi.py \
-  --resolucion 9 \
-  --fecha-inicio 2026-06-24 \
-  --fecha-fin 2026-09-22 \
-  --proyecto TU_PROYECTO_GEE
-```
+### 6. Cargar caminos
 
-Este script actualiza la propiedad `CeldaH3.ndvi_actual`.
-
-### 5) Calcular estructura de vegetación por celda H3
-
-```bash
-python etls/etl_gee_estructura.py --resolucion 9
-```
-
-Escribe en cada celda:
-- `canopy_height_mean`
-- `canopy_height_max`
-- `cobertura_arbolada_pct`
-
-### 6) Cargar caminos (si se cuenta con el shapefile o GeoJSON)
-
-```bash
-python etls/etl_caminos.py \
-  --input ruta/a/caminos_internos.shp \
-  --geojson-blp data/boundary/La_Primavera.geojson \
-  --tipo interno \
+```powershell
+python etls/etl_caminos.py `
+  --input data/raw/caminos_primavera.geojson `
+  --geojson-blp data/boundary/La_Primavera.geojson `
+  --tipo interno `
   --resolucion 8
 ```
 
-### 7) Calcular comunidades de especies por co-ocurrencia
+El ETL crea nodos `Camino` y relaciones `CERCANA_A`. El formato de entrada
+puede ser Shapefile o GeoJSON; usa `--help` para ver los nombres exactos de
+los argumentos opcionales.
 
-```bash
+### 7. Calcular variables de vegetación
+
+NDVI reciente con Sentinel-2:
+
+```powershell
+python etls/etl_gee_ndvi.py --resolucion 9
+```
+
+Opcionalmente:
+
+```powershell
+python etls/etl_gee_ndvi.py `
+  --resolucion 9 `
+  --fecha-inicio 2026-06-24 `
+  --fecha-fin 2026-09-22 `
+  --proyecto TU_PROYECTO_GEE
+```
+
+Estructura del dosel y cobertura arbórea con Meta Canopy Height y ESA
+WorldCover:
+
+```powershell
+python etls/etl_gee_estructura.py --resolucion 9
+```
+
+### 8. Detectar incendios históricos
+
+`etl_gee_incendios.py` compara NBR de Landsat entre años consecutivos,
+enmascara nubes y superficies no vegetadas, calcula dNBR por celda y escribe
+`EventoDisturbio`, `AFECTADO_POR` y métricas agregadas en `CeldaH3`.
+
+Primero revisa el resultado sin modificar Neo4j:
+
+```powershell
+python etls/etl_gee_incendios.py `
+  --resolucion 8 `
+  --anio-inicio 2000 `
+  --anio-fin 2025 `
+  --dry-run
+```
+
+Después de calibrar los umbrales con la tabla de sensibilidad impresa por el
+script, ejecuta nuevamente sin `--dry-run`. La ventana adaptativa y los
+resultados anuales se guardan en `cache/`; usa `--sin-cache` para ignorarlos.
+Otros parámetros importantes son `--umbral-dnbr`, `--umbral-fraccion`,
+`--min-valido`, `--min-cobertura-anual`, `--sin-adaptativo` y `--sin-offset`.
+
+### 9. Construir comunidades de especies
+
+```powershell
 python etls/clustering_especies.py
 ```
 
-Esto usa Louvain en `networkx` y escribe `Especie.cluster_especies`.
+Este script lee `COOCURRE_CON`, aplica Louvain con `networkx` y guarda
+`cluster_especies` en cada nodo `Especie`. La red de co-ocurrencia debe existir
+antes de ejecutar este paso.
 
-## Comandos útiles para explorar opciones
+## API FastAPI
 
-```bash
-python etls/etl_especies_obser.py --help
-python etls/generar_grid_h3.py --help
-python etls/etl_gee_ndvi.py --help
-python etls/etl_gee_estructura.py --help
-python etls/etl_caminos.py --help
-python etls/clustering_especies.py --help
-```
+Inicia el backend desde la raíz; hacerlo desde `backend/` puede impedir que se
+encuentren `utils` y `.env`:
 
-## API backend
-
-El backend está implementado con FastAPI y se debe ejecutar desde la raíz del
-proyecto para que encuentre `utils` y `.env`.
-
-```bash
+```powershell
 python -m uvicorn backend.main:app --reload
 ```
 
-La API estará disponible en:
-- http://localhost:8000
-- Swagger docs: http://localhost:8000/docs
+URLs útiles:
 
-### Endpoints implementados
+- API: <http://localhost:8000>
+- Swagger: <http://localhost:8000/docs>
+- OpenAPI: <http://localhost:8000/openapi.json>
+
+### Endpoints disponibles
+
+| Método | Ruta | Descripción |
+| --- | --- | --- |
+| `GET` | `/health` | Comprueba la API y la consulta a Neo4j. |
+| `GET` | `/grafo/especies` | Devuelve nodos y aristas del grafo de especies. |
+| `GET` | `/grafo/especies?incluir_aisladas=true` | Incluye especies sin clúster. |
+| `GET` | `/grafo/especies/resumen` | Cuenta especies por clúster y devuelve su color. |
+| `GET` | `/celdas?resolucion=8` | Devuelve celdas H3 y estadísticas por zona. |
+
+`/celdas` acepta `bbox=west,south,east,north` para acotar la consulta:
 
 ```text
-GET /health
-GET /grafo/especies
-GET /grafo/especies?incluir_aisladas=true
-GET /grafo/especies/resumen
-GET /celdas?resolucion=8
 GET /celdas?resolucion=9&bbox=-103.6,20.5,-103.4,20.8
 ```
 
-### Descripción de los endpoints
+Ejemplos con `curl`:
 
-- `/health`: confirma que la API responde y que puede consultar Neo4j.
-  Devuelve `status` y `nodos_en_base`.
-- `/grafo/especies`: devuelve nodos `Especie` y aristas `COOCURRE_CON` con
-  color por `cluster_especies` y forma según el reino.
-- `/grafo/especies?incluir_aisladas=true`: incluye especies sin clúster.
-- `/grafo/especies/resumen`: cuenta especies por clúster para uso visual.
-- `/celdas`: devuelve celdas H3 con su `boundary`, resolución, conteo por zona y
-  color dominante. El parámetro `bbox` acepta `west,south,east,north`.
-
-### Pruebas rápidas
-
-```bash
+```powershell
 curl http://localhost:8000/health
 curl http://localhost:8000/grafo/especies
-curl "http://localhost:8000/grafo/especies?incluir_aisladas=true"
-curl http://localhost:8000/grafo/especies/resumen
-curl "http://localhost:8000/celdas?resolucion=8"
 curl "http://localhost:8000/celdas?resolucion=9&bbox=-103.6,20.5,-103.4,20.8"
 ```
 
-## Solución de problemas comunes
+## Verificación y diagnóstico
 
-- `KeyError: NEO4J_URI` o `KeyError: NEO4J_PASSWORD`: falta una variable en
-  `.env` o el archivo está en otra ubicación.
-- Error de conexión con Neo4j: revisa la dirección, el esquema (`neo4j://`,
-  `neo4j+s://`, etc.) y que la base se encuentre disponible.
-- Error con Earth Engine: ejecuta `earthengine authenticate` y asegúrate de que
-  `GEE_PROJECT` exista y esté habilitado en Google Cloud.
-- La API devuelve cero celdas: revisa que ya se haya corrido `generar_grid_h3.py`
-  para la resolución que consultas.
-- El backend debe ejecutarse con:
+Prueba la conexión y cuenta las celdas existentes:
 
-```bash
-python -m uvicorn backend.main:app --reload
+```powershell
+python tests/probar_conexion.py
 ```
 
-## Notas del repositorio
+Para revisar caminos que cruzan el límite del bosque:
 
-- `utils/neo4j_conn.py` centraliza la conexión a Neo4j y manejar certificados
-  con `certifi`.
-- `backend/database.py` carga `.env` desde la raíz y expone una dependencia
-  `get_session()` para FastAPI.
-- Los scripts `etl_gee_ndvi.py` y `etl_gee_estructura.py` requieren que la
-  grilla H3 ya exista antes de calcular estadísticas zonales.
-- El archivo `schema/schema.cypher` debe ejecutarse antes de cargar datos si la
-  base está vacía.
-
-## Estado del proyecto
-
-El repositorio actual ya contiene la base para:
-
-- cargar observaciones y especies desde CSV
-- generar y consultar celdas H3
-- calcular NDVI y estructura del dosel mediante GEE
-- crear relaciones de co-ocurrencia espacial entre especies
-- consultar el grafo y la distribución espacial a través de FastAPI
-
-Si quieres continuar el desarrollo, el siguiente paso natural es conectar el
-frontend al backend para visualizar celdas, especies y grafo de co-ocurrencia en
-el mapa.
-  desde la raíz; ejecutar Uvicorn dentro de `backend/` rompe la importación de
-  `utils`.
-
-## ETL de clustering de especies
-
-`etls/clustering_especies.py` agrupa las especies a partir de la red de
-co-ocurrencia espacial (`COOCURRE_CON`). Lee las relaciones desde Neo4j,
-construye el grafo en `networkx` y aplica el algoritmo de comunidades Louvain
-incluido en `networkx`, usando `r.peso` como peso de cada relación. El resultado
-se guarda en cada nodo `Especie` mediante la propiedad `cluster_especies`.
-
-El script requiere que la red `COOCURRE_CON` ya exista en Neo4j. Lee las
-credenciales desde el archivo `.env`:
-
-```env
-NEO4J_URI=neo4j+s://TU_ID.databases.neo4j.io
-NEO4J_USER=TU_USUARIO
-NEO4J_PASSWORD=TU_PASSWORD
+```powershell
+python tests/contar_cruces.py
 ```
 
-Al finalizar muestra el número de relaciones, especies, clusters y la
-modularidad calculada. En Neo4j Bloom, `cluster_especies` puede utilizarse como
-atributo de color o agrupación para visualizar las comunidades.
+Para consultar opciones de cualquier ETL:
 
-## Institucion — falta cargar info sobre como actuan. ya se tienen los predios
-
-Un ejemplo de como podría ser la carga es el siguiente:
-
-```cypher
-UNWIND [
-  {nombre: "ITESO", tipo: "academica", labor: "monitoreo"},
-  {nombre: "Tec de Monterrey", tipo: "academica", labor: "monitoreo"},
-  {nombre: "OPD Bosque La Primavera", tipo: "gubernamental", labor: "gestion"},
-  {nombre: "Ejido", tipo: "comunitaria", labor: "uso de suelo"},
-  {nombre: "Colectivo", tipo: "civil", labor: "vigilancia"}
-] AS row
-MERGE (i:Institucion {nombre: row.nombre})
-SET i.tipo = row.tipo, i.labor = row.labor;
+```powershell
+python etls/NOMBRE_DEL_SCRIPT.py --help
 ```
 
-La relación `ACTUA_SOBRE` (Institución→Observación, con el peso compuesto
-`0.2·dist_calle + 0.3·dist_arboles` del pizarrón) **no se carga todavía** —
-depende de que definan la fórmula completa y de tener `dist_calle` resuelto
-(necesita el shp de caminos) y `dist_arboles` (la variable de estructura ya se
-calcula por celda, pero todavía falta definir cómo convertirla en distancia a
-árboles y completar la fórmula).
+Problemas frecuentes:
 
-## Verificación rápida post-carga
+- `KeyError: NEO4J_URI` o `NEO4J_PASSWORD`: falta una variable en `.env`.
+- Error TLS o de autenticación: revisa el esquema de `NEO4J_URI`, usuario,
+  contraseña y disponibilidad de la instancia.
+- Error de Earth Engine: vuelve a ejecutar `earthengine authenticate` y
+  confirma que `GEE_PROJECT` está habilitado.
+- Cero celdas: genera primero el grid H3 para la resolución consultada.
+- Fallos de importación de `utils`: ejecuta los comandos desde la raíz y
+  verifica que el entorno virtual esté activo.
 
-```cypher
-MATCH (o:Observacion) RETURN count(o);                    // ~12,077
-MATCH (e:Especie) RETURN count(e);                        // ~1,909
-MATCH (c:CeldaH3 {resolucion: 8}) RETURN count(c);
-MATCH (c:CeldaH3 {resolucion: 8})-[r:ADYACENTE_A]->() RETURN count(r);
+## Estado actual
 
-// Celdas con NDVI calculado
-MATCH (c:CeldaH3 {resolucion: 9})
-WHERE c.ndvi_actual IS NOT NULL
-RETURN count(c), min(c.ndvi_actual), max(c.ndvi_actual);
+El proyecto ya permite:
 
-// Celdas con variables de estructura calculadas
-MATCH (c:CeldaH3)
-WHERE c.canopy_height_mean IS NOT NULL
-RETURN c.resolucion AS resolucion,
-       count(c) AS total_celdas,
-       round(avg(c.canopy_height_mean), 2) AS altura_promedio_m,
-       round(max(c.canopy_height_max), 2) AS altura_maxima_m,
-       round(avg(c.cobertura_arbolada_pct), 2) AS cobertura_promedio_pct
-ORDER BY resolucion;
+- cargar observaciones y taxonomía;
+- generar celdas H3 y adyacencias;
+- calcular NDVI, estructura de vegetación e incendios históricos con GEE;
+- cargar caminos, predios e instituciones;
+- calcular comunidades de especies por co-ocurrencia;
+- consultar el grafo y las celdas mediante FastAPI.
 
-// También puede usarse el siguiente para verificar NDVI
-MATCH (c:CeldaH3)
-WHERE c.ndvi_actual IS NOT NULL
-RETURN c.resolucion AS resolucion,
-       count(c) AS total_celdas,
-       round(min(c.ndvi_actual), 3) AS ndvi_min,
-       round(avg(c.ndvi_actual), 3) AS ndvi_promedio,
-       round(max(c.ndvi_actual), 3) AS ndvi_max
-ORDER BY resolucion;
-
-// Top especies por número de observaciones
-MATCH (o:Observacion)-[:PERTENECE_A]->(e:Especie)
-RETURN e.nombre_cientifico, count(o) AS n
-ORDER BY n DESC LIMIT 10;
-```
+La relación `ACTUA_SOBRE` y sus variables de distancia todavía requieren
+definir la fórmula de vulnerabilidad y completar los insumos necesarios.

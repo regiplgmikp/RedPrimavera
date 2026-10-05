@@ -59,7 +59,8 @@ def celdas_en_bbox(bbox: tuple[float, float, float, float], resolucion: int) -> 
     west, south, east, north = bbox
     ring_latlon = [(south, west), (south, east), (north, east), (north, west)]
     poly = h3.LatLngPoly(ring_latlon)
-
+    
+    print("polygon_to_cells_experimental disponible:", hasattr(h3, "polygon_to_cells_experimental"))
     if hasattr(h3, "polygon_to_cells_experimental"):
         try:
             return set(
@@ -70,6 +71,7 @@ def celdas_en_bbox(bbox: tuple[float, float, float, float], resolucion: int) -> 
         except Exception:
             pass
     return set(h3.polygon_to_cells(poly, resolucion))
+
 
 
 def dentro_de_bbox(
@@ -89,7 +91,6 @@ def parsear_bbox(bbox_str: str | None) -> tuple[float, float, float, float] | No
         raise ValueError("bbox debe tener 4 valores: west,south,east,north")
     return partes[0], partes[1], partes[2], partes[3]
 
-
 @router.get("", response_model=list[CeldaH3])
 def listar_celdas(
     resolucion: int = Query(8, description="Resolución H3 (8 o 9 en este proyecto)"),
@@ -104,8 +105,15 @@ def listar_celdas(
 
     bbox_tupla = parsear_bbox(bbox)
 
-    query = """
-    MATCH (c:CeldaH3 {resolucion: $resolucion})
+    params: dict[str, int | list[str]] = {"resolucion": resolucion}
+    filtro_bbox = ""
+    if bbox_tupla is not None:
+        params["h3_ids"] = list(celdas_en_bbox(bbox_tupla, resolucion))
+        filtro_bbox = " AND c.h3_id IN $h3_ids"
+
+    query = f"""
+    MATCH (c:CeldaH3 {{resolucion: $resolucion}})
+    WHERE true{filtro_bbox}
     OPTIONAL MATCH (c)<-[:UBICADA_EN]-(o:Observacion)
     RETURN c.h3_id AS h3_id,
            sum(CASE WHEN o.zona = 'nucleo' THEN 1 ELSE 0 END) AS n_nucleo,
@@ -115,13 +123,8 @@ def listar_celdas(
     """
 
     celdas = []
-    for record in session.run(query, resolucion=resolucion):
+    for record in session.run(query, **params):
         h3_id = record["h3_id"]
-        lat_centro, lon_centro = h3.cell_to_latlng(h3_id)
-
-        if not dentro_de_bbox(lat_centro, lon_centro, bbox_tupla):
-            continue
-
         boundary = [[lat, lon] for lat, lon in h3.cell_to_boundary(h3_id)]
         dominante, color = zona_dominante_y_color(
             record["n_nucleo"], record["n_zona_mab"], record["n_fuera"]
