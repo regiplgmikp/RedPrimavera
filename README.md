@@ -15,9 +15,12 @@ RedPrimavera/
 ├── backend/
 │   ├── main.py                  # Aplicación FastAPI y ciclo de vida
 │   ├── database.py              # Driver singleton y sesiones Neo4j
+│   ├── analisis/
+│   │   └── metricas_red.py      # Métricas topológicas para subgrafos
 │   └── routers/
 │       ├── celdas.py            # Celdas H3 y estadísticas por zona
-│       └── grafo.py             # Grafo de especies y clústeres
+│       ├── grafo.py             # Grafo de especies y clústeres
+│       └── subgrafos.py         # Subgrafos territoriales filtrables
 ├── data/
 │   ├── boundary/                # GeoJSON de límites y predios
 │   └── raw/                     # Insumos locales; ignorados por Git
@@ -29,13 +32,18 @@ RedPrimavera/
 │   ├── etl_gee_estructura.py
 │   ├── etl_gee_incendios.py
 │   ├── etl_gee_ndvi.py
+│   ├── etl_indice_vulnerabilidad.py
 │   ├── etl_instituciones.py
 │   └── generar_grid_h3.py
 ├── schema/
 │   └── schema.cypher             # Constraints, índices y modelo del grafo
 ├── tests/
 │   ├── contar_cruces.py
-│   └── probar_conexion.py
+│   ├── probar_conexion.py
+│   ├── probar_subgrafos.py
+│   ├── reparar_adyacencia.py
+│   ├── test_metricas_red.py
+│   └── validar_mcd64a1.py
 ├── utils/
 │   └── neo4j_conn.py             # Conexión y verificación de Neo4j
 ├── .env                          # Solo local; nunca versionar
@@ -268,6 +276,26 @@ Este script lee `COOCURRE_CON`, aplica Louvain con `networkx` y guarda
 `cluster_especies` en cada nodo `Especie`. La red de co-ocurrencia debe existir
 antes de ejecutar este paso.
 
+### 10. Calcular el Índice de Vulnerabilidad Compuesto
+
+El ETL `etl_indice_vulnerabilidad.py` calcula el IVC por resolución a partir de
+incendios, distancia a caminos, biomasa del dosel, NDVI y pertenencia a
+predios. Normaliza los componentes con los percentiles p5 y p95, no rellena
+datos faltantes y muestra un análisis de sensibilidad de los pesos.
+
+Primero calcula un resumen sin escribir en Neo4j:
+
+```powershell
+python etls/etl_indice_vulnerabilidad.py `
+  --resoluciones 8 9 `
+  --dry-run
+```
+
+Cuando el resultado sea satisfactorio, repite el comando sin `--dry-run` para
+guardar `indice_vulnerabilidad`, `subindice_exposicion`,
+`subindice_sensibilidad`, `subindice_adaptativo` y sus componentes en cada
+`CeldaH3`. Las celdas sin todas las variables requeridas quedan sin IVC.
+
 ## API FastAPI
 
 Inicia el backend desde la raíz; hacerlo desde `backend/` puede impedir que se
@@ -292,11 +320,28 @@ URLs útiles:
 | `GET` | `/grafo/especies?incluir_aisladas=true` | Incluye especies sin clúster. |
 | `GET` | `/grafo/especies/resumen` | Cuenta especies por clúster y devuelve su color. |
 | `GET` | `/celdas?resolucion=8` | Devuelve celdas H3 y estadísticas por zona. |
+| `GET` | `/subgrafos/celdas` | Devuelve celdas filtradas, adyacencias y métricas topológicas. |
+| `GET` | `/subgrafos/especies` | Devuelve co-ocurrencias restringidas al territorio filtrado. |
 
 `/celdas` acepta `bbox=west,south,east,north` para acotar la consulta:
 
 ```text
 GET /celdas?resolucion=9&bbox=-103.6,20.5,-103.4,20.8
+```
+
+Los endpoints `/subgrafos/celdas` y `/subgrafos/especies` aceptan filtros como
+`ivc_min`, `frecuencia_min`, `ndvi_min`, `dosel_min`,
+`distancia_camino_max`, `en_predio`, `institucion` y `bbox`. El subgrafo de
+especies también acepta `zona`, `categoria` y
+`min_celdas_compartidas`. Las métricas de red se calculan sobre el subconjunto
+filtrado y se entregan normalizadas para que un cliente geoespacial pueda
+usarlas directamente.
+
+Ejemplos:
+
+```powershell
+curl "http://localhost:8000/subgrafos/celdas?resolucion=8&ivc_min=0.6&distancia_camino_max=1000"
+curl "http://localhost:8000/subgrafos/especies?resolucion=8&ivc_min=0.6&min_celdas_compartidas=2"
 ```
 
 Ejemplos con `curl`:
@@ -319,6 +364,20 @@ Para revisar caminos que cruzan el límite del bosque:
 
 ```powershell
 python tests/contar_cruces.py
+```
+
+Con la API corriendo, valida los subgrafos, la adyacencia H3 y las métricas
+topológicas:
+
+```powershell
+python tests/probar_subgrafos.py
+```
+
+Las pruebas unitarias de `backend/analisis/metricas_red.py` se ejecutan con
+pytest:
+
+```powershell
+python -m pytest tests/test_metricas_red.py
 ```
 
 Para consultar opciones de cualquier ETL:
@@ -347,7 +406,10 @@ El proyecto ya permite:
 - calcular NDVI, estructura de vegetación e incendios históricos con GEE;
 - cargar caminos, predios e instituciones;
 - calcular comunidades de especies por co-ocurrencia;
+- calcular el Índice de Vulnerabilidad Compuesto por celda;
+- generar subgrafos territoriales con métricas de conectividad y centralidad;
 - consultar el grafo y las celdas mediante FastAPI.
 
-La relación `ACTUA_SOBRE` y sus variables de distancia todavía requieren
-definir la fórmula de vulnerabilidad y completar los insumos necesarios.
+La relación `ACTUA_SOBRE` todavía no es creada por los ETL. La fórmula del IVC
+ya está implementada, pero requiere que las variables de entrada estén
+disponibles para que una celda reciba un valor completo.
