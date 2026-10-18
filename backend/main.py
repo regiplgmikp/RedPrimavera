@@ -16,8 +16,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import get_session, cerrar_driver
-from .routers import grafo, celdas
-from .routers import grafo, celdas, subgrafos
+from .routers import grafo, celdas, subgrafos, capas
 
 load_dotenv()
 
@@ -34,6 +33,7 @@ app = FastAPI(title="RedPrimavera API", version="0.1.0", lifespan=lifespan)
 app.include_router(grafo.router)
 app.include_router(celdas.router)
 app.include_router(subgrafos.router)
+app.include_router(capas.router)
 
 
 cors_origins = os.environ.get("CORS_ORIGINS", "").split(",")

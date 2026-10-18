@@ -58,6 +58,7 @@ class NodoCelda(BaseModel):
     ultimo_incendio: int | None
     ndvi: float | None
     dosel: float | None
+    poblacion: float | None
     distancia_camino: float | None
     en_predio: bool
     instituciones: list[str]
@@ -91,7 +92,11 @@ class MetricasEspecie(BaseModel):
 class NodoEspecieSub(BaseModel):
     id: str
     nombre_comun: str | None
-    reino_iconico: str | None
+    reino_iconico: str | None   # taxón icónico de iNaturalist (Plantae, Aves, Insecta...)
+    tipo: str                   # flora | fauna | hongos (misma regla que routers/grafo.py)
+    lat: float | None           # centro de las celdas del filtro donde aparece (para sobreponer al mapa)
+    lon: float | None
+    n_celdas: int
     metricas: MetricasEspecie
 
 
@@ -177,7 +182,8 @@ def subgrafo_celdas(filtro: FiltroCeldas = Depends(filtros_dependency),
             frecuencia_incendios=_limpiar(r["frecuencia_incendios"]),
             periodo_retorno=_limpiar(r["periodo_retorno"]),
             ultimo_incendio=r["ultimo_incendio"], ndvi=_limpiar(r["ndvi"]),
-            dosel=_limpiar(r["dosel"]), distancia_camino=_limpiar(r["distancia_camino"]),
+            dosel=_limpiar(r["dosel"]), poblacion=_limpiar(r["poblacion"]),
+            distancia_camino=_limpiar(r["distancia_camino"]),
             en_predio=bool(r["en_predio"]), instituciones=r["instituciones"] or [],
             n_observaciones=r["n_observaciones"], n_especies=r["n_especies"],
             metricas=MetricasCelda(**res["metricas"][r["h3_id"]]),
@@ -220,10 +226,17 @@ def subgrafo_especies(
     info = {}
     if nombres:
         info = {r["id"]: r for r in session.run(CONSULTA_META_ESPECIES, nombres=nombres)}
+    coords = {h: h3.cell_to_latlng(h) for h in {p[0] for p in pares}}
+    centros = mr.centroides_por_especie(pares, coords)
     nodos = []
     for nombre, m in res["metricas"].items():
         i = info.get(nombre)
+        c = centros.get(nombre)
+        reino = _limpiar(i["reino_iconico"]) if i else None
         nodos.append(NodoEspecieSub(
+            tipo=("flora" if reino == "Plantae" else "hongos" if reino == "Fungi" else "fauna"),
+            lat=c["lat"] if c else None, lon=c["lon"] if c else None,
+            n_celdas=c["n_celdas"] if c else 0,
             id=nombre,
             nombre_comun=_limpiar(i["nombre_comun"]) if i else None,
             reino_iconico=_limpiar(i["reino_iconico"]) if i else None,
