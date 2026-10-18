@@ -200,3 +200,25 @@ def metricas_especies(G: nx.Graph, max_exacto=800, k=K_MUESTRA) -> dict:
         "intermediacion_aproximada": aprox,
     }
     return {"metricas": metricas, "aristas": aristas, "meta": meta}
+
+
+def centroides_por_especie(pares_celda_especie, coords_celda):
+    """
+    Posición geográfica aproximada de cada especie: promedio de las celdas del filtro donde
+    aparece. Sirve para dibujar la red SOBRE el mapa (sobreposición) -- es el centro de donde
+    se ha visto, no un punto real de la especie.
+
+    pares_celda_especie: [(h3_id, especie), ...]; coords_celda: {h3_id: (lat, lon)}.
+    Devuelve {especie: {"lat": ..., "lon": ..., "n_celdas": ...}}.
+    """
+    celdas_por_especie = {}
+    for h3_id, especie in pares_celda_especie:
+        if h3_id in coords_celda:
+            celdas_por_especie.setdefault(especie, set()).add(h3_id)
+    out = {}
+    for especie, celdas in celdas_por_especie.items():
+        lats = [coords_celda[c][0] for c in celdas]
+        lons = [coords_celda[c][1] for c in celdas]
+        out[especie] = {"lat": sum(lats) / len(lats), "lon": sum(lons) / len(lons),
+                        "n_celdas": len(celdas)}
+    return out

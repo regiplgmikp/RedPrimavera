@@ -1,5 +1,6 @@
 # Secretos y credenciales
 .env
+frontend/.env
 
 # Entorno virtual
 venv/
@@ -12,12 +13,16 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Datos crudos
+# Datos
 data/raw/
+data/processed/
+
+# Front
+frontend/node_modules/
+frontend/dist/
 
 # Configuraciones de editor y SO
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-package-lock.json

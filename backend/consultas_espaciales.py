@@ -167,3 +167,10 @@ WHERE e.nombre_cientifico IN $nombres
 RETURN e.nombre_cientifico AS id, e.nombre_comun AS nombre_comun,
        e.reino_iconico AS reino_iconico
 """
+
+
+CONSULTA_CELDAS_ESPECIE = """
+MATCH (c:CeldaH3 {resolucion: $resolucion})<-[:UBICADA_EN]-(o:Observacion)-[:PERTENECE_A]->(e:Especie {nombre_cientifico: $nombre})
+WHERE $zona IS NULL OR o.zona = $zona
+RETURN c.h3_id AS h3_id, count(o) AS n_observaciones
+"""

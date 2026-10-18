@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from ..analisis import metricas_red as mr
 from ..consultas_espaciales import (
     CONSULTA_ARISTAS_CELDAS,
+    CONSULTA_CELDAS_ESPECIE,
     CONSULTA_META_ESPECIES,
     FiltroCeldas,
     consulta_nodos_celdas,
@@ -249,4 +250,40 @@ def subgrafo_especies(
                  "min_celdas_compartidas": min_celdas_compartidas},
         meta=res["meta"], nodos=nodos,
         aristas=[AristaPeso(source=a, target=b, peso=w) for a, b, w in res["aristas"]],
+    )
+
+
+class CeldaObservada(BaseModel):
+    h3_id: str
+    boundary: list[list[float]]  # [[lat, lon], ...]
+    n_observaciones: int
+
+
+class ObservacionesEspecie(BaseModel):
+    especie: str
+    resolucion: int
+    n_observaciones: int
+    celdas: list[CeldaObservada]
+
+
+@router.get("/especies/observaciones", response_model=ObservacionesEspecie)
+def observaciones_especie(
+    nombre: str = Query(..., min_length=1, max_length=200, description="Nombre científico exacto"),
+    resolucion: int = Query(8, ge=8, le=9),
+    zona: str | None = Query(None, pattern="^(nucleo|zona_mab|fuera)$"),
+    session=Depends(get_session),
+):
+    """Celdas donde se observó una especie (con el nº de observaciones por celda), para iluminarlas en el mapa."""
+    filas = list(session.run(CONSULTA_CELDAS_ESPECIE, resolucion=resolucion, nombre=nombre, zona=zona))
+    celdas = [
+        CeldaObservada(
+            h3_id=r["h3_id"],
+            boundary=[[lat, lon] for lat, lon in h3.cell_to_boundary(r["h3_id"])],
+            n_observaciones=r["n_observaciones"],
+        )
+        for r in filas
+    ]
+    return ObservacionesEspecie(
+        especie=nombre, resolucion=resolucion,
+        n_observaciones=sum(c.n_observaciones for c in celdas), celdas=celdas,
     )
