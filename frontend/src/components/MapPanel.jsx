@@ -31,6 +31,7 @@ function usarTemaOscuro() {
 export default function MapPanel({ celdas, poblacion, vista, sobreposicion, grafoTipo, observaciones, seleccion, onSelect, onEncuadre }) {
   const contenedor = useRef(null);
   const [tam, setTam] = useState({ width: 800, height: 600 });
+  const [tip, setTip] = useState(null); // información bajo el cursor: { x, y, html }
   const [viewState, setViewState] = useState(VISTA_INICIAL);
   const [ajusteTick, setAjusteTick] = useState(0);
   const yaAjustado = useRef(false);
@@ -93,6 +94,7 @@ export default function MapPanel({ celdas, poblacion, vista, sobreposicion, graf
   }, [observaciones?.datos]);
 
   const idCeldaSel = seleccion?.tipo === 'celda' ? seleccion.id : null;
+  const celdaSel = idCeldaSel && datos ? datos.nodos.find((c) => c.h3_id === idCeldaSel) : null;
   const idNodoSel = seleccion && sobreposicion ? seleccion.id : null;
 
   const capas = [
@@ -163,10 +165,20 @@ export default function MapPanel({ celdas, poblacion, vista, sobreposicion, graf
         onViewStateChange={({ viewState: v }) => setViewState(v)}
         controller
         layers={capas}
-        getTooltip={tooltip}
+        onHover={(info) => { const t = info?.object ? tooltip(info) : null; setTip(t ? { x: info.x, y: info.y, html: t.html } : null); }}
         onClick={alClic}
         style={{ position: 'absolute', inset: 0 }}
       />
+      {tip && (
+        <div className="tip-mapa" style={{ position: 'absolute', zIndex: 4, pointerEvents: 'none', left: Math.max(8, Math.min(tip.x + 14, tam.width - 300)), top: Math.max(8, Math.min(tip.y + 14, tam.height - 210)), maxWidth: 290, fontSize: 12, lineHeight: 1.5, padding: '6px 9px', background: 'var(--panel)', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,.35)' }}
+          dangerouslySetInnerHTML={{ __html: tip.html }} />
+      )}
+      {celdaSel && (
+        <div className="detalle-celda" role="status" style={{ position: 'absolute', top: 44, left: 12, zIndex: 3, maxWidth: 300, fontSize: 12, lineHeight: 1.5, padding: '8px 28px 8px 10px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 6 }}>
+          <button aria-label="Cerrar detalle" onClick={() => onSelect(null)} style={{ position: 'absolute', top: 2, right: 4, padding: '0 6px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: 14 }}>×</button>
+          <div dangerouslySetInnerHTML={{ __html: htmlCelda(celdaSel) }} />
+        </div>
+      )}
       <Leyenda
         modo="mapa" campo={vista.colorMapa} def={CAMPOS_COLOR[vista.colorMapa]} rango={rango}
         poblacion={vista.verPoblacion ? poblacion : null} sobreponer={Boolean(sobreposicion)} observaciones={observaciones}

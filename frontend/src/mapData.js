@@ -60,6 +60,7 @@ export function htmlCelda(c) {
   const m = c.metricas;
   return `<b>${esc(c.h3_id)}</b><br>IVC: ${f(c.ivc)} (E ${f(c.exposicion)} · S ${f(c.sensibilidad)})`
     + `<br>Incendios/año: ${f(c.frecuencia_incendios)} · retorno: ${c.periodo_retorno == null ? '—' : Math.round(c.periodo_retorno) + ' años'}`
+    + `<br>NDVI: ${f(c.ndvi)} · dosel: ${c.dosel == null ? '—' : f(c.dosel) + ' m'}`
     + `<br>Camino: ${c.distancia_camino == null ? '—' : Math.round(c.distancia_camino) + ' m'} · ${c.en_predio ? 'en predio' : 'sin predio'}`
     + `<br>Observaciones: ${c.n_observaciones} · especies: ${c.n_especies}`
     + (c.poblacion != null ? `<br>Población estimada: ${Math.round(c.poblacion).toLocaleString('es-MX')}` : '')
