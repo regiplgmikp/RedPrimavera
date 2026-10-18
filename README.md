@@ -4,9 +4,8 @@ RedPrimavera es un proyecto de análisis espacial y vulnerabilidad del Bosque
 La Primavera. Integra observaciones de biodiversidad, una malla H3, variables
 de vegetación, incendios, caminos, predios e instituciones en un grafo de
 Neo4j. Los procesos ETL preparan y cargan la información; una API FastAPI
-expone los datos para un frontend geoespacial.
-
-> El repositorio contiene el backend y los ETL. No incluye un frontend.
+expone los datos a un frontend geoespacial construido con React, Vite,
+Deck.gl y Sigma.
 
 ## Arquitectura
 
@@ -15,9 +14,11 @@ RedPrimavera/
 ├── backend/
 │   ├── main.py                  # Aplicación FastAPI y ciclo de vida
 │   ├── database.py              # Driver singleton y sesiones Neo4j
+│   ├── consultas_espaciales.py  # Consultas Cypher reutilizables
 │   ├── analisis/
 │   │   └── metricas_red.py      # Métricas topológicas para subgrafos
 │   └── routers/
+│       ├── capas.py             # Capas auxiliares, como población
 │       ├── celdas.py            # Celdas H3 y estadísticas por zona
 │       ├── grafo.py             # Grafo de especies y clústeres
 │       └── subgrafos.py         # Subgrafos territoriales filtrables
@@ -34,6 +35,7 @@ RedPrimavera/
 │   ├── etl_gee_ndvi.py
 │   ├── etl_indice_vulnerabilidad.py
 │   ├── etl_instituciones.py
+│   ├── etl_poblacion_kontur.py
 │   └── generar_grid_h3.py
 ├── schema/
 │   └── schema.cypher             # Constraints, índices y modelo del grafo
@@ -46,12 +48,18 @@ RedPrimavera/
 │   └── validar_mcd64a1.py
 ├── utils/
 │   └── neo4j_conn.py             # Conexión y verificación de Neo4j
+├── frontend/                     # Aplicación React/Vite
+│   ├── src/
+│   ├── test/
+│   ├── package.json
+│   └── .env.example
 ├── .env                          # Solo local; nunca versionar
 └── README.md
 ```
 
 `cache/`, `venv/`, `.env`, `data/raw/` y los archivos compilados de Python
-están excluidos por `.gitignore`.
+están excluidos por `.gitignore`. Las dependencias instaladas de Node se
+guardan en `frontend/node_modules/` y también están excluidas.
 
 ## Requisitos
 
@@ -106,6 +114,30 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 `neo4j+ssc://`, `neo4j://` o `bolt://`). `CORS_ORIGINS` es opcional y acepta
 orígenes separados por comas. Los scripts que usan Earth Engine leen
 `GEE_PROJECT` o permiten indicar el proyecto por línea de comandos.
+
+### Configurar el frontend
+
+En otra terminal, desde la raíz del repositorio:
+
+```powershell
+cd frontend
+Copy-Item .env.example .env
+npm install
+```
+
+El archivo `frontend/.env` permite configurar la URL del backend:
+
+```env
+VITE_API_URL=http://127.0.0.1:8000
+```
+
+Si se cambia ese valor, el origen del frontend también debe estar incluido en
+`CORS_ORIGINS` del `.env` de la raíz. Por ejemplo, para el servidor de
+desarrollo:
+
+```env
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+```
 
 ### Autenticar Google Earth Engine
 
@@ -276,7 +308,27 @@ Este script lee `COOCURRE_CON`, aplica Louvain con `networkx` y guarda
 `cluster_especies` en cada nodo `Especie`. La red de co-ocurrencia debe existir
 antes de ejecutar este paso.
 
-### 10. Calcular el Índice de Vulnerabilidad Compuesto
+### 10. Cargar población de Kontur
+
+Descarga manualmente el GeoPackage de población de Kontur México desde
+[Humanitarian Data Exchange](https://data.humdata.org/dataset/kontur-population-mexico)
+y guárdalo en `data/raw/`. El archivo no se incluye en el repositorio.
+El ETL carga la población únicamente en celdas H3 de resolución 8; no
+interpela datos hacia resolución 9.
+
+Primero revisa el resultado:
+
+```powershell
+python etls/etl_poblacion_kontur.py `
+  --gpkg data/raw/kontur_population_MX.gpkg `
+  --dry-run
+```
+
+Después repite el comando sin `--dry-run` para escribir
+`poblacion_kontur` en Neo4j. La fuente se distribuye bajo licencia CC BY 4.0;
+la interfaz muestra la atribución correspondiente.
+
+### 11. Calcular el Índice de Vulnerabilidad Compuesto
 
 El ETL `etl_indice_vulnerabilidad.py` calcula el IVC por resolución a partir de
 incendios, distancia a caminos, biomasa del dosel, NDVI y pertenencia a
@@ -337,6 +389,13 @@ especies también acepta `zona`, `categoria` y
 filtrado y se entregan normalizadas para que un cliente geoespacial pueda
 usarlas directamente.
 
+También están disponibles:
+
+- `/subgrafos/especies/observaciones`, para obtener las celdas donde se
+  observó una especie;
+- `/subgrafos/celdas/especies`, para obtener las especies de una celda;
+- `/capas/poblacion`, para consultar la capa de población de Kontur.
+
 Ejemplos:
 
 ```powershell
@@ -351,6 +410,24 @@ curl http://localhost:8000/health
 curl http://localhost:8000/grafo/especies
 curl "http://localhost:8000/celdas?resolucion=9&bbox=-103.6,20.5,-103.4,20.8"
 ```
+
+### Iniciar el frontend
+
+Con el backend corriendo, inicia la interfaz desde otra terminal:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Abre <http://localhost:5173>. La interfaz permite:
+
+- explorar celdas H3 coloreadas por IVC, NDVI, dosel, incendios o población;
+- aplicar filtros territoriales y ajustar la resolución automáticamente con
+  el encuadre del mapa;
+- consultar el grafo de especies o el grafo de celdas;
+- seleccionar una especie o celda para resaltar sus relaciones;
+- superponer el grafo territorial sobre el mapa.
 
 ## Verificación y diagnóstico
 
@@ -378,6 +455,13 @@ pytest:
 
 ```powershell
 python -m pytest tests/test_metricas_red.py
+```
+
+Las pruebas de la lógica del frontend se ejecutan desde `frontend/`:
+
+```powershell
+npm test
+npm run build
 ```
 
 Para consultar opciones de cualquier ETL:
