@@ -287,3 +287,31 @@ def observaciones_especie(
         especie=nombre, resolucion=resolucion,
         n_observaciones=sum(c.n_observaciones for c in celdas), celdas=celdas,
     )
+
+class EspecieEnCelda(BaseModel):
+    id: str                 # nombre científico (el mismo id que usan los nodos del grafo de especies)
+    n_observaciones: int
+
+
+class EspeciesDeCelda(BaseModel):
+    h3_id: str
+    n_observaciones: int
+    especies: list[EspecieEnCelda]
+
+
+@router.get("/celdas/especies", response_model=EspeciesDeCelda)
+def especies_de_celda(
+    h3_id: str = Query(..., min_length=10, max_length=20, description="Código H3 de la celda"),
+    zona: str | None = Query(None, pattern="^(nucleo|zona_mab|fuera)$"),
+    session=Depends(get_session),
+):
+    """Especies observadas en una celda, con el nº de observaciones de cada una."""
+    q = """
+    MATCH (c:CeldaH3 {h3_id: $h3_id})<-[:UBICADA_EN]-(o:Observacion)-[:PERTENECE_A]->(e:Especie)
+    WHERE $zona IS NULL OR o.zona = $zona
+    RETURN e.nombre_cientifico AS especie, count(o) AS n
+    ORDER BY n DESC
+    """
+    filas = list(session.run(q, h3_id=h3_id, zona=zona))
+    especies = [EspecieEnCelda(id=r["especie"], n_observaciones=r["n"]) for r in filas]
+    return EspeciesDeCelda(h3_id=h3_id, n_observaciones=sum(e.n_observaciones for e in especies), especies=especies)

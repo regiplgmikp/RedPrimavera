@@ -13,6 +13,13 @@ export function tamanoPorCentralidad(norm, min = TAM_MIN, max = TAM_MAX) {
   return min + (max - min) * Math.sqrt(t);
 }
 
+// Con muchos nodos los círculos grandes se encapsulan y el grafo se vuelve una mancha:
+// el tamaño máximo baja con la raíz del número de nodos (y sube hasta TAM_MAX con pocos).
+export function tamanoMaximo(n) {
+  return Math.max(5, Math.min(TAM_MAX, 130 / Math.sqrt(Math.max(n, 1))));
+}
+const TAM_BAJO = 1.5;
+
 function centroideCelda(n) {
   const b = n.boundary;
   return [b.reduce((s, p) => s + p[0], 0) / b.length, b.reduce((s, p) => s + p[1], 0) / b.length]; // [lat, lon]
@@ -22,6 +29,7 @@ const TAMANO_ESPECIE = { intermediacion_norm: 'intermediacion_norm', fuerza_norm
 
 export function grafoEspecies(data, { colorPor = 'taxonomia', tamanoPor = 'intermediacion_norm' } = {}) {
   const campo = TAMANO_ESPECIE[tamanoPor] || 'intermediacion_norm';
+  const tmax = tamanoMaximo((data?.nodos || []).length);
   const nodos = (data?.nodos || []).map((n) => {
     const m = n.metricas;
     const color = colorPor === 'comunidad'
@@ -30,7 +38,8 @@ export function grafoEspecies(data, { colorPor = 'taxonomia', tamanoPor = 'inter
     return {
       id: n.id,
       label: n.nombre_comun ? `${n.id} (${n.nombre_comun})` : n.id,
-      size: tamanoPorCentralidad(m[campo]),
+      size: tamanoPorCentralidad(m[campo], TAM_BAJO, tmax),
+      norm: m[campo],
       color,
       lat: n.lat ?? null,
       lon: n.lon ?? null,
@@ -41,9 +50,28 @@ export function grafoEspecies(data, { colorPor = 'taxonomia', tamanoPor = 'inter
   const maxPeso = Math.max(1, ...(data?.aristas || []).map((a) => a.peso));
   const aristas = (data?.aristas || []).map((a) => ({
     id: `${a.source}||${a.target}`, source: a.source, target: a.target,
-    size: 0.5 + 2.5 * (a.peso / maxPeso), peso: a.peso,
+    size: 0.3 + 1.2 * (a.peso / maxPeso), peso: a.peso,
   }));
-  return { tipo: 'especies', nodos, aristas, leyenda: leyendaEspecies(nodos, colorPor), titulo: 'Co-ocurrencia de especies' };
+  return { tipo: 'especies', colorPor, nodos, aristas, leyenda: leyendaEspecies(nodos, colorPor), titulo: 'Co-ocurrencia de especies' };
+}
+
+// Recorta la red de especies a las que viven en una celda: se queda con esos nodos y con las
+// aristas que los unen entre sí. Los tamaños se recalculan para que se vean con pocos nodos
+// (la centralidad sigue siendo la de la red completa). `omitidas` cuenta especies de la celda
+// que no están en la red (por ejemplo, filtradas por la zona).
+export function subgrafoDeEspecies(grafo, ids) {
+  const quedan = new Set(ids);
+  const nodos = grafo.nodos.filter((n) => quedan.has(n.id));
+  const presentes = new Set(nodos.map((n) => n.id));
+  const tmax = tamanoMaximo(nodos.length);
+  return {
+    ...grafo,
+    titulo: 'Especies de la celda',
+    nodos: nodos.map((n) => ({ ...n, size: tamanoPorCentralidad(n.norm, TAM_BAJO, tmax) })),
+    aristas: grafo.aristas.filter((e) => presentes.has(e.source) && presentes.has(e.target)),
+    leyenda: leyendaEspecies(nodos, grafo.colorPor),
+    omitidas: quedan.size - presentes.size,
+  };
 }
 
 function leyendaEspecies(nodos, colorPor) {
@@ -79,7 +107,7 @@ export function grafoCeldas(data, { colorPor = 'institucion', tamanoPor = 'inter
       grupo = `bloque ${m.componente + 1}`;
     }
     return {
-      id: c.h3_id, label: c.h3_id, size: tamanoPorCentralidad(m[tamanoPor] ?? m.intermediacion_norm, 1.5, Math.max(5, Math.min(TAM_MAX, 120 / Math.sqrt(celdas.length)))),
+      id: c.h3_id, label: c.h3_id, size: tamanoPorCentralidad(m[tamanoPor] ?? m.intermediacion_norm, TAM_BAJO, tamanoMaximo(celdas.length)),
       color, lat, lon, grupo,
       detalle: { ivc: c.ivc, grado: m.grado, intermediacion: m.intermediacion, instituciones: c.instituciones || [], componente: m.componente },
     };
@@ -104,10 +132,11 @@ export function grafoCeldas(data, { colorPor = 'institucion', tamanoPor = 'inter
 export function datosSobreposicion(grafo, { radioMin = 60, radioMax = 420 } = {}) {
   const conPos = grafo.nodos.filter((n) => n.lat != null && n.lon != null);
   const pos = new Map(conPos.map((n) => [n.id, [n.lon, n.lat]]));
-  const maxSize = Math.max(TAM_MIN, ...conPos.map((n) => n.size));
+  const minSize = Math.min(...conPos.map((n) => n.size));
+  const maxSize = Math.max(minSize, ...conPos.map((n) => n.size));
   const puntos = conPos.map((n) => ({
     id: n.id, position: pos.get(n.id), color: n.color, label: n.label,
-    radio: radioMin + (radioMax - radioMin) * ((n.size - TAM_MIN) / ((maxSize - TAM_MIN) || 1)),
+    radio: radioMin + (radioMax - radioMin) * ((n.size - minSize) / ((maxSize - minSize) || 1)),
   }));
   const lineas = grafo.aristas
     .filter((e) => pos.has(e.source) && pos.has(e.target))

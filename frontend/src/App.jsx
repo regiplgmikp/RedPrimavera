@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { getCeldas, getEspecies, getObservaciones, getPoblacion } from './api.js';
+import { getCeldas, getEspecies, getEspeciesDeCelda, getObservaciones, getPoblacion } from './api.js';
 import { ZOOM_PARA_RES_9 } from './config.js';
 import { bboxTexto } from './mapData.js';
-import { datosSobreposicion, grafoCeldas, grafoEspecies } from './graphData.js';
+import { datosSobreposicion, grafoCeldas, grafoEspecies, subgrafoDeEspecies } from './graphData.js';
 import FilterPanel from './components/FilterPanel.jsx';
 import MapPanel from './components/MapPanel.jsx';
 import GraphPanel from './components/GraphPanel.jsx';
@@ -26,6 +26,8 @@ export default function App() {
   const [especies, setEspecies] = useState({ datos: null, cargando: true, error: null });
   const [poblacion, setPoblacion] = useState({ datos: null, error: null });
   const [seleccion, setSeleccion] = useState(null);         // { tipo: 'celda' | 'especie', id }
+  const [celdaFoco, setCeldaFoco] = useState(null);         // celda cuyas especies se muestran en el grafo
+  const [especiesCelda, setEspeciesCelda] = useState({ id: null, datos: null, cargando: false, error: null });
   const [observaciones, setObservaciones] = useState({ id: null, datos: null, cargando: false, error: null });
 
   const resolucion = vista.autoRes && encuadre ? (encuadre.zoom >= ZOOM_PARA_RES_9 ? 9 : 8) : vista.resolucion;
@@ -72,19 +74,43 @@ export default function App() {
     return () => ctl.abort();
   }, [especieSel, resolucion, aplicados.zona]);
 
+  // Al hacer clic en una celda (con la red de especies activa) se piden sus especies y el grafo se recorta a ellas
+  const focoActivo = vista.grafo === 'especies' ? celdaFoco : null;
+  useEffect(() => {
+    if (!focoActivo) { setEspeciesCelda({ id: null, datos: null, cargando: false, error: null }); return undefined; }
+    const ctl = new AbortController();
+    setEspeciesCelda({ id: focoActivo, datos: null, cargando: true, error: null });
+    getEspeciesDeCelda(focoActivo, aplicados.zona, ctl.signal)
+      .then((d) => setEspeciesCelda({ id: focoActivo, datos: d, cargando: false, error: null }))
+      .catch((e) => { if (!esAbort(e)) setEspeciesCelda({ id: focoActivo, datos: null, cargando: false, error: e.message }); });
+    return () => ctl.abort();
+  }, [focoActivo, aplicados.zona]);
+
+  const elegir = useCallback((sel) => {
+    setSeleccion(sel);
+    if (!sel) setCeldaFoco(null);                       // clic en el fondo o × : vuelve la red completa
+    else if (sel.tipo === 'celda') setCeldaFoco(sel.id); // elegir una especie NO cambia la celda enfocada
+  }, []);
+
   const grafo = useMemo(() => {
     if (vista.grafo === 'especies') {
       const color = vista.colorGrafo === 'comunidad' ? 'comunidad' : 'taxonomia';
-      return especies.datos ? grafoEspecies(especies.datos, { colorPor: color, tamanoPor: vista.tamanoGrafo }) : null;
+      const completo = especies.datos ? grafoEspecies(especies.datos, { colorPor: color, tamanoPor: vista.tamanoGrafo }) : null;
+      if (completo && focoActivo && especiesCelda.id === focoActivo && especiesCelda.datos) {
+        const sub = subgrafoDeEspecies(completo, especiesCelda.datos.especies.map((e) => e.id));
+        return { ...sub, titulo: `Especies de la celda ${focoActivo} (${sub.nodos.length})` };
+      }
+      return completo;
     }
     const color = ['institucion', 'ivc', 'bloque'].includes(vista.colorGrafo) ? vista.colorGrafo : 'institucion';
     return celdas.datos ? grafoCeldas(celdas.datos, { colorPor: color, tamanoPor: vista.tamanoGrafo === 'fuerza_norm' ? 'intermediacion_norm' : vista.tamanoGrafo }) : null;
-  }, [vista.grafo, vista.colorGrafo, vista.tamanoGrafo, especies.datos, celdas.datos]);
+  }, [vista.grafo, vista.colorGrafo, vista.tamanoGrafo, especies.datos, celdas.datos, focoActivo, especiesCelda]);
 
   const sobreposicion = useMemo(() => (vista.sobreponer && grafo?.tipo === 'celdas' ? datosSobreposicion(grafo) : null), [vista.sobreponer, grafo]);
 
   const cambiarVista = useCallback((cambios) => {
     // la selección de un tipo de grafo no tiene sentido en el otro
+    if (cambios.grafo) setCeldaFoco(null);
     if (cambios.grafo) setSeleccion((sel) => (sel && sel.tipo !== (cambios.grafo === 'especies' ? 'especie' : 'celda') ? null : sel));
     setVista((v) => {
       const nuevo = { ...v, ...cambios };
@@ -109,20 +135,20 @@ export default function App() {
         aplicar={() => {
           const mc = Math.min(50, Math.max(1, Number(form.min_celdas_compartidas) || 1));
           const f = { ...form, min_celdas_compartidas: mc };
-          setForm(f); setSeleccion(null); setAplicados(f);
+          setForm(f); setSeleccion(null); setCeldaFoco(null); setAplicados(f);
         }}
-        limpiar={() => { setForm(FILTROS_VACIOS); setSeleccion(null); setAplicados(FILTROS_VACIOS); }}
+        limpiar={() => { setForm(FILTROS_VACIOS); setSeleccion(null); setCeldaFoco(null); setAplicados(FILTROS_VACIOS); }}
         metaCeldas={celdas.datos?.meta} metaEspecies={especies.datos?.meta}
         omitidos={sobreposicion?.omitidos}
       />
       <main className="paneles" data-disposicion={vista.disposicion}>
         <MapPanel
           celdas={celdas} poblacion={poblacion} vista={vista} sobreposicion={sobreposicion}
-          grafoTipo={grafo?.tipo} observaciones={observaciones} seleccion={seleccion} onSelect={setSeleccion} onEncuadre={setEncuadre}
+          grafoTipo={grafo?.tipo} observaciones={observaciones} seleccion={seleccion} onSelect={elegir} onEncuadre={setEncuadre}
         />
         <GraphPanel
           grafo={grafo} estado={vista.grafo === 'especies' ? especies : celdas}
-          seleccion={seleccion} onSelect={setSeleccion}
+          seleccion={seleccion} onSelect={elegir}
         />
       </main>
     </div>

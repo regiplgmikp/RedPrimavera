@@ -29,3 +29,4 @@ export const getCeldas = (filtros, signal) => pedir('/subgrafos/celdas', filtros
 export const getEspecies = (filtros, extra, signal) => pedir('/subgrafos/especies', { ...filtros, ...extra }, signal);
 export const getPoblacion = (signal) => pedir('/capas/poblacion', {}, signal);
 export const getObservaciones = (nombre, resolucion, zona, signal) => pedir('/subgrafos/especies/observaciones', { nombre, resolucion, zona }, signal);
+export const getEspeciesDeCelda = (h3_id, zona, signal) => pedir('/subgrafos/celdas/especies', { h3_id, zona }, signal);
