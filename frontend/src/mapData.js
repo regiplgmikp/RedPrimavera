@@ -13,6 +13,8 @@ export const CAMPOS_COLOR = {
   cercania_norm: { etiqueta: 'Cercanía (centralidad)', paleta: VIRIDIS, valor: (c) => c.metricas.cercania_norm },
   n_observaciones: { etiqueta: 'Número de observaciones', paleta: VIRIDIS, valor: (c) => c.n_observaciones },
   componente: { etiqueta: 'Bloque conectado', categorico: true, valor: (c) => c.metricas.componente },
+  ndvi: { etiqueta: 'NDVI medio (vigor de la vegetación)', paleta: VIRIDIS, valor: (c) => c.ndvi },
+  dosel: { etiqueta: 'Altura media del dosel (m)', paleta: VIRIDIS, valor: (c) => c.dosel },
 };
 
 export function rangoDe(celdas, campo) {
