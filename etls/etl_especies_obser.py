@@ -139,6 +139,12 @@ def cargar_csv(path_csv: str, ring_nucleo: list = None, ring_mab: list = None) -
             print(f"Filtrado por quality_grade=research: {antes} -> {len(df)} filas")
 
     df = df.dropna(subset=["latitude", "longitude", "scientific_name", "taxon_id"])
+    
+    if "coordinates_obscured" in df.columns:
+        antes = len(df)
+        df = df[df["coordinates_obscured"].astype(str).str.lower() != "true"].copy()
+        print(f"Excluidas coordenadas obscurecidas: {antes} -> {len(df)} filas")
+        
     df["categoria"] = df["iconic_taxon_name"].apply(categoria_desde_iconic)
 
     if ring_nucleo is not None:
@@ -233,7 +239,7 @@ MERGE (o)-[:PERTENECE_A]->(e)
 
 WITH o, row
 UNWIND row.celdas AS celda
-  MERGE (c:CeldaH3 {h3_id: celda.h3_id, resolucion: celda.resolucion})
+    MATCH (c:CeldaH3 {h3_id: celda.h3_id, resolucion: celda.resolucion})
   MERGE (o)-[:UBICADA_EN]->(c)
 """
 
