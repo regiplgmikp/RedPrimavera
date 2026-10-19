@@ -8,7 +8,8 @@ normalizadas a [0, 1]; no recalcula nada.
   GET /subgrafos/celdas    celdas H3 filtradas por atributos territoriales + adyacencia
   GET /subgrafos/especies  red de co-ocurrencia de especies dentro de ese mismo filtro
 """
-
+import time
+import unicodedata
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
@@ -316,3 +317,80 @@ def especies_de_celda(
     filas = list(session.run(q, h3_id=h3_id, zona=zona))
     especies = [EspecieEnCelda(id=r["especie"], n_observaciones=r["n"]) for r in filas]
     return EspeciesDeCelda(h3_id=h3_id, n_observaciones=sum(e.n_observaciones for e in especies), especies=especies)
+
+# ---------------------------------------------------------------- búsqueda de especies
+CONSULTA_TODAS_ESPECIES = """
+MATCH (e:Especie)
+OPTIONAL MATCH (e)<-[:PERTENECE_A]-(o:Observacion)
+RETURN e.nombre_cientifico AS id, e.nombre_comun AS nombre_comun,
+       e.reino_iconico AS reino_iconico, count(o) AS n_observaciones
+"""
+_CACHE_ESPECIES = {"t": 0.0, "filas": []}
+_CACHE_SEGUNDOS = 600
+
+
+def _limpio(valor):
+    if isinstance(valor, str) and valor.strip() and valor.strip().lower() not in ("nan", "none"):
+        return valor.strip()
+    return None
+
+
+def _normalizar(texto) -> str:
+    """Minúsculas y sin acentos, para que 'carpintero' encuentre 'Carpíntero'."""
+    if not texto:
+        return ""
+    t = unicodedata.normalize("NFD", str(texto).lower())
+    return "".join(c for c in t if unicodedata.category(c) != "Mn")
+
+
+def _especies_indexadas(session):
+    ahora = time.time()
+    if not _CACHE_ESPECIES["filas"] or ahora - _CACHE_ESPECIES["t"] > _CACHE_SEGUNDOS:
+        filas = []
+        for r in session.run(CONSULTA_TODAS_ESPECIES):
+            comun = _limpio(r["nombre_comun"])
+            filas.append({
+                "id": r["id"],
+                "nombre_comun": comun,
+                "reino_iconico": _limpio(r["reino_iconico"]),
+                "n_observaciones": r["n_observaciones"],
+                "texto": _normalizar(f"{comun or ''} {r['id']}"),
+                "inicio": (_normalizar(comun), _normalizar(r["id"])),
+            })
+        _CACHE_ESPECIES.update(t=ahora, filas=filas)
+    return _CACHE_ESPECIES["filas"]
+
+
+class EspecieBusqueda(BaseModel):
+    id: str                  # nombre científico (el mismo id que usan los nodos del grafo)
+    nombre_comun: str | None
+    reino_iconico: str | None
+    n_observaciones: int
+
+
+class ResultadoBusqueda(BaseModel):
+    q: str
+    total: int
+    resultados: list[EspecieBusqueda]
+
+
+@router.get("/especies/buscar", response_model=ResultadoBusqueda)
+def buscar_especies(
+    q: str = Query(..., min_length=2, max_length=80, description="Texto en el nombre común o científico"),
+    limite: int = Query(10, ge=1, le=25),
+    session=Depends(get_session),
+):
+    """Busca especies por nombre común o científico (sin distinguir mayúsculas ni acentos)."""
+    palabras = _normalizar(q).split()
+    if not palabras:
+        raise HTTPException(status_code=422, detail="Escribe al menos 2 letras")
+    texto = " ".join(palabras)
+    coinciden = [f for f in _especies_indexadas(session) if all(p in f["texto"] for p in palabras)]
+    coinciden.sort(key=lambda f: (not any(n.startswith(texto) for n in f["inicio"]), -f["n_observaciones"], f["id"]))
+    return ResultadoBusqueda(
+        q=q, total=len(coinciden),
+        resultados=[
+            EspecieBusqueda(**{k: f[k] for k in ("id", "nombre_comun", "reino_iconico", "n_observaciones")})
+            for f in coinciden[:limite]
+        ],
+    )

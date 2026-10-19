@@ -28,6 +28,10 @@ export function construirGrafo(spec) {
       g.addEdge(e.source, e.target, { size: e.size, color: 'rgba(154,167,160,0.28)' });
     }
   }
+  //if (spec.tipo === 'especies') {
+    // las especies sin ninguna arista no aportan a la red y se apilan en un anillo: no se dibujan
+  //  g.nodes().forEach((id) => { if (g.degree(id) === 0) g.dropNode(id); });
+  //}
   if (g.order > 1 && g.size > 0) {
     forceAtlas2.assign(g, {
       iterations: g.order > 800 ? 80 : 200,

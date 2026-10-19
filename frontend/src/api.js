@@ -30,3 +30,4 @@ export const getEspecies = (filtros, extra, signal) => pedir('/subgrafos/especie
 export const getPoblacion = (signal) => pedir('/capas/poblacion', {}, signal);
 export const getObservaciones = (nombre, resolucion, zona, signal) => pedir('/subgrafos/especies/observaciones', { nombre, resolucion, zona }, signal);
 export const getEspeciesDeCelda = (h3_id, zona, signal) => pedir('/subgrafos/celdas/especies', { h3_id, zona }, signal);
+export const buscarEspecies = (q, signal) => pedir('/subgrafos/especies/buscar', { q, limite: 8 }, signal);

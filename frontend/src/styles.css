@@ -45,3 +45,15 @@ button.secundario { background: transparent; color: var(--accent); width: 100%; 
 .msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--muted); z-index: 2; background: color-mix(in srgb, var(--bg) 85%, transparent); white-space: pre-line; pointer-events: none; }
 .aviso-flotante { position: absolute; top: 44px; left: 12px; z-index: 3; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; max-width: 70%; }
 .info { position: absolute; right: 12px; bottom: 26px; z-index: 3; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font-size: 12px; max-width: 45%; }
+/* Buscador de especies */
+input[type=search] { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; }
+input[type=search]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.buscador { margin: 8px 0 14px; }
+.sugerencias { list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); max-height: 260px; overflow: auto; }
+.sugerencias li.info { padding: 6px 8px; font-size: 12px; color: var(--muted); }
+.sugerencias button { display: block; width: 100%; text-align: left; background: transparent; color: var(--ink); border: 0; padding: 6px 8px; border-radius: 4px; font: inherit; font-size: 13px; cursor: pointer; }
+.sugerencias button:hover, .sugerencias button:focus-visible { background: var(--panel); }
+.sugerencias button i, .sugerencias button span { color: var(--muted); font-size: 12px; }
+.seleccion-especie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-top: 8px; padding: 6px 8px; border: 1px solid var(--accent); border-radius: 6px; font-size: 13px; }
+.seleccion-especie button { background: transparent; color: var(--ink); border: 0; font-size: 16px; line-height: 1; cursor: pointer; }
+.seleccion-especie .aviso { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--muted); }

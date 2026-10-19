@@ -1,11 +1,13 @@
 import React from 'react';
 import { CAMPOS_COLOR } from '../mapData.js';
+import BuscadorEspecies from './BuscadorEspecies.jsx';
 
 function Campo({ id, etiqueta, children }) {
   return (<div className="campo"><label htmlFor={id}>{etiqueta}</label>{children}</div>);
 }
 
-export default function FilterPanel({ form, setForm, vista, cambiarVista, resolucionEfectiva, aplicar, limpiar, metaCeldas, metaEspecies, omitidos }) {
+export default function FilterPanel({ form, setForm, vista, cambiarVista, resolucionEfectiva, 
+  aplicar, limpiar, metaCeldas, metaEspecies, omitidos,especieSel, avisoEspecie, onElegirEspecie, onQuitarEspecie }) {
   const num = (id, props = {}) => (
     <input id={id} type="number" placeholder="sin filtro" value={form[id]} {...props}
       onChange={(e) => setForm({ ...form, [id]: e.target.value })}
@@ -39,6 +41,7 @@ export default function FilterPanel({ form, setForm, vista, cambiarVista, resolu
       </Campo>
 
       <h2>Red de especies</h2>
+      <BuscadorEspecies seleccionada={especieSel} aviso={avisoEspecie} onElegir={onElegirEspecie} onQuitar={onQuitarEspecie} />
       <Campo id="zona" etiqueta="Zona de las observaciones">
         {sel('zona', [['', 'Todas'], ['nucleo', 'Núcleo'], ['zona_mab', 'Zona de transición'], ['fuera', 'Fuera de la poligonal']])}
       </Campo>

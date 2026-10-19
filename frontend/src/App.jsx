@@ -106,6 +106,18 @@ export default function App() {
     return celdas.datos ? grafoCeldas(celdas.datos, { colorPor: color, tamanoPor: vista.tamanoGrafo === 'fuerza_norm' ? 'intermediacion_norm' : vista.tamanoGrafo }) : null;
   }, [vista.grafo, vista.colorGrafo, vista.tamanoGrafo, especies.datos, celdas.datos, focoActivo, especiesCelda]);
 
+    // Especie elegida (desde el buscador o con clic en el grafo) y aviso si no sale dibujada en el grafo
+  const especieSeleccionada = useMemo(() => {
+    if (seleccion?.tipo !== 'especie') return null;
+    const nodo = grafo?.nodos?.find((n) => n.id === seleccion.id);
+    return { id: seleccion.id, etiqueta: nodo?.label || seleccion.id };
+  }, [seleccion, grafo]);
+  const avisoEspecie = useMemo(() => {
+    if (!especieSeleccionada || grafo?.tipo !== 'especies') return null;
+    const conectada = grafo.aristas.some((e) => e.source === especieSeleccionada.id || e.target === especieSeleccionada.id);
+    return conectada ? null : 'Esta especie no tiene vínculos con el umbral actual, por eso no aparece en el grafo; el mapa sí ilumina sus celdas.';
+  }, [especieSeleccionada, grafo]);
+
   const sobreposicion = useMemo(() => (vista.sobreponer && grafo?.tipo === 'celdas' ? datosSobreposicion(grafo) : null), [vista.sobreponer, grafo]);
 
   const cambiarVista = useCallback((cambios) => {
@@ -140,6 +152,8 @@ export default function App() {
         limpiar={() => { setForm(FILTROS_VACIOS); setSeleccion(null); setCeldaFoco(null); setAplicados(FILTROS_VACIOS); }}
         metaCeldas={celdas.datos?.meta} metaEspecies={especies.datos?.meta}
         omitidos={sobreposicion?.omitidos}
+        especieSel={especieSeleccionada} avisoEspecie={avisoEspecie}
+        onElegirEspecie={(id) => elegir({ tipo: 'especie', id })} onQuitarEspecie={() => elegir(null)}
       />
       <main className="paneles" data-disposicion={vista.disposicion}>
         <MapPanel
