@@ -1,11 +1,17 @@
 # RedPrimavera
 
-RedPrimavera es un proyecto de análisis espacial y vulnerabilidad del Bosque
-La Primavera. Integra observaciones de biodiversidad, una malla H3, variables
-de vegetación, incendios, caminos, predios e instituciones en un grafo de
-Neo4j. Los procesos ETL preparan y cargan la información; una API FastAPI
-expone los datos a un frontend geoespacial construido con React, Vite,
-Deck.gl y Sigma.
+RedPrimavera es una aplicación de análisis espacial y vulnerabilidad del
+Bosque La Primavera. Integra observaciones de biodiversidad, una malla H3,
+variables de vegetación, incendios, caminos, predios, instituciones y
+población en un grafo de Neo4j. Los procesos ETL preparan y cargan la
+información; una API FastAPI calcula subgrafos y métricas de red; y un
+frontend geoespacial en React, Vite, Deck.gl y Sigma permite explorar los
+resultados.
+
+La aplicación trabaja principalmente con celdas H3 de resolución 8
+(aproximadamente 70–90 ha) y 9 (aproximadamente 10 ha). Las métricas
+topológicas se calculan sobre el subconjunto que resulta de los filtros
+territoriales, no sobre toda la red.
 
 ## Arquitectura
 
@@ -50,7 +56,6 @@ RedPrimavera/
 │   └── neo4j_conn.py             # Conexión y verificación de Neo4j
 ├── frontend/                     # Aplicación React/Vite
 │   ├── src/
-│   ├── test/
 │   ├── package.json
 │   └── .env.example
 ├── .env                          # Solo local; nunca versionar
@@ -59,16 +64,20 @@ RedPrimavera/
 
 `cache/`, `venv/`, `.env`, `data/raw/` y los archivos compilados de Python
 están excluidos por `.gitignore`. Las dependencias instaladas de Node se
-guardan en `frontend/node_modules/` y también están excluidas.
+guardan en `frontend/node_modules/` y también están excluidas. Los archivos
+geoespaciales de `data/boundary/` sí forman parte del proyecto; los insumos
+pesados o descargados para los ETL deben colocarse en `data/raw/`.
 
 ## Requisitos
 
 - Python 3.10 o posterior.
+- Node.js 18 o posterior y npm para el frontend.
 - Neo4j 5.x accesible desde el equipo.
 - Una cuenta y un proyecto de Google Earth Engine para los ETL de NDVI,
   estructura e incendios.
-- Un archivo de observaciones en CSV (Naturalist/iNaturalist) y los insumos
-  geoespaciales que correspondan a cada ETL.
+- Un archivo de observaciones en CSV de iNaturalist/Naturalist o un archivo
+  `occurrence.txt` de GBIF (Darwin Core).
+- Los insumos geoespaciales que correspondan a cada ETL.
 
 ### Crear el entorno e instalar dependencias
 
@@ -78,7 +87,7 @@ En Windows PowerShell:
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install pandas geopandas shapely osmnx h3 neo4j networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api
+python -m pip install pandas geopandas shapely pyogrio osmnx h3 neo4j networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api pytest
 ```
 
 Si PowerShell impide activar el entorno:
@@ -94,7 +103,7 @@ En Linux/macOS:
 python3 -m venv venv
 source venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install pandas geopandas shapely osmnx h3 neo4j networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api
+python -m pip install pandas geopandas shapely pyogrio osmnx h3 neo4j networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api pytest
 ```
 
 ## Configuración
@@ -171,7 +180,10 @@ Institucion -[:PROPIETARIA_DE]-> Predio
 ```
 
 La clasificación espacial usada por las observaciones es `nucleo`,
-`zona_mab` y `fuera`.
+`zona_mab` y `fuera`. En la interfaz, `zona_mab` se presenta como “zona de
+transición”. El nombre del atributo es provisional porque la fuente de
+geometría distingue entre amortiguamiento y transición; debe confirmarse
+antes de cambiarlo en los datos.
 
 ## Flujo de carga recomendado
 
@@ -207,8 +219,20 @@ python etls/etl_especies_obser.py `
   --resoluciones 8 9
 ```
 
-El nombre y la ubicación del CSV dependen del insumo disponible. Consulta
-todas las opciones con:
+También puede cargarse un archivo Darwin Core de GBIF. `--csv` y `--gbif`
+son fuentes alternativas; `--limite` permite probar con una muestra:
+
+```powershell
+python etls/etl_especies_obser.py `
+  --gbif data/raw/gbif/occurrence.txt `
+  --limite 10000 `
+  --geojson-blp data/boundary/La_Primavera.geojson `
+  --geojson-mab data/boundary/AreaTransicion.geojson `
+  --resoluciones 8 9
+```
+
+El nombre y la ubicación del insumo dependen de la fuente disponible.
+Consulta todas las opciones con:
 
 ```powershell
 python etls/etl_especies_obser.py --help
@@ -357,6 +381,10 @@ encuentren `utils` y `.env`:
 python -m uvicorn backend.main:app --reload
 ```
 
+La API necesita `NEO4J_URI` y `NEO4J_PASSWORD` para crear el driver bajo
+demanda. El endpoint `/health`, además de comprobar que la aplicación está
+viva, ejecuta una consulta sencilla contra Neo4j.
+
 URLs útiles:
 
 - API: <http://localhost:8000>
@@ -374,6 +402,10 @@ URLs útiles:
 | `GET` | `/celdas?resolucion=8` | Devuelve celdas H3 y estadísticas por zona. |
 | `GET` | `/subgrafos/celdas` | Devuelve celdas filtradas, adyacencias y métricas topológicas. |
 | `GET` | `/subgrafos/especies` | Devuelve co-ocurrencias restringidas al territorio filtrado. |
+| `GET` | `/subgrafos/especies/buscar?q=...` | Busca especies por nombre científico o común. |
+| `GET` | `/subgrafos/especies/observaciones` | Devuelve las celdas donde aparece una especie. |
+| `GET` | `/subgrafos/celdas/especies` | Devuelve las especies observadas en una celda. |
+| `GET` | `/capas/poblacion` | Devuelve la capa de población Kontur en resolución 8. |
 
 `/celdas` acepta `bbox=west,south,east,north` para acotar la consulta:
 
@@ -381,20 +413,18 @@ URLs útiles:
 GET /celdas?resolucion=9&bbox=-103.6,20.5,-103.4,20.8
 ```
 
-Los endpoints `/subgrafos/celdas` y `/subgrafos/especies` aceptan filtros como
-`ivc_min`, `frecuencia_min`, `ndvi_min`, `dosel_min`,
-`distancia_camino_max`, `en_predio`, `institucion` y `bbox`. El subgrafo de
-especies también acepta `zona`, `categoria` y
-`min_celdas_compartidas`. Las métricas de red se calculan sobre el subconjunto
-filtrado y se entregan normalizadas para que un cliente geoespacial pueda
-usarlas directamente.
+Los endpoints `/subgrafos/celdas` y `/subgrafos/especies` comparten filtros de
+territorio: `resolucion` (8 o 9), `ivc_min`, `ivc_max`, `frecuencia_min`,
+`frecuencia_max`, `ultimo_incendio_desde`, `ndvi_min`, `ndvi_max`,
+`dosel_min`, `distancia_camino_min`, `distancia_camino_max`, `en_predio`,
+`institucion` y `bbox`. El subgrafo de especies también acepta `zona`,
+`categoria` y `min_celdas_compartidas`. `bbox` usa el formato
+`west,south,east,north` en grados decimales.
 
-También están disponibles:
-
-- `/subgrafos/especies/observaciones`, para obtener las celdas donde se
-  observó una especie;
-- `/subgrafos/celdas/especies`, para obtener las especies de una celda;
-- `/capas/poblacion`, para consultar la capa de población de Kontur.
+Las métricas de red se calculan sobre el subconjunto filtrado y se entregan
+normalizadas para que un cliente geoespacial pueda usarlas directamente. El
+endpoint `/subgrafos/celdas` tiene un límite de seguridad de 4,000 celdas por
+respuesta.
 
 Ejemplos:
 
@@ -423,11 +453,14 @@ npm run dev
 Abre <http://localhost:5173>. La interfaz permite:
 
 - explorar celdas H3 coloreadas por IVC, NDVI, dosel, incendios o población;
-- aplicar filtros territoriales y ajustar la resolución automáticamente con
-  el encuadre del mapa;
+- visualizar también observaciones, centralidad y bloques conectados;
+- aplicar filtros territoriales y ajustar la resolución automáticamente según
+  el zoom y el encuadre del mapa;
 - consultar el grafo de especies o el grafo de celdas;
-- seleccionar una especie o celda para resaltar sus relaciones;
-- superponer el grafo territorial sobre el mapa.
+- buscar y seleccionar una especie para iluminar sus celdas de observación;
+- seleccionar una celda para consultar sus especies;
+- superponer el grafo territorial sobre el mapa y cambiar el tamaño/color de
+  los nodos según sus métricas.
 
 ## Verificación y diagnóstico
 
@@ -457,12 +490,24 @@ pytest:
 python -m pytest tests/test_metricas_red.py
 ```
 
-Las pruebas de la lógica del frontend se ejecutan desde `frontend/`:
+La suite de Node configurada para el frontend se ejecuta desde `frontend/`:
 
 ```powershell
 npm test
 npm run build
 ```
+
+También hay scripts auxiliares para revisar la red y los datos:
+
+```powershell
+python tests/reparar_adyacencia.py --help
+python tests/validar_mcd64a1.py --help
+```
+
+`reparar_adyacencia.py` solo aplica cambios si se especifica `--aplicar`.
+`validar_mcd64a1.py` inspecciona la detección de incendios MCD64A1 en Earth
+Engine. Los scripts `tests/probar_conexion.py`, `tests/probar_subgrafos.py` y
+`tests/contar_cruces.py` requieren una instancia de Neo4j con datos cargados.
 
 Para consultar opciones de cualquier ETL:
 
@@ -492,8 +537,21 @@ El proyecto ya permite:
 - calcular comunidades de especies por co-ocurrencia;
 - calcular el Índice de Vulnerabilidad Compuesto por celda;
 - generar subgrafos territoriales con métricas de conectividad y centralidad;
-- consultar el grafo y las celdas mediante FastAPI.
+- consultar el grafo y las celdas mediante FastAPI;
+- explorar el mapa con color por IVC, incendios, NDVI, dosel, observaciones o
+  bloques conectados;
+- consultar población estimada de Kontur y superponer el grafo de celdas;
+- seleccionar especies o celdas para iluminar sus relaciones y observaciones.
 
 La relación `ACTUA_SOBRE` todavía no es creada por los ETL. La fórmula del IVC
 ya está implementada, pero requiere que las variables de entrada estén
 disponibles para que una celda reciba un valor completo.
+
+## Licencias y atribuciones de datos
+
+La capa de población procede de Kontur Population México y se muestra con
+atribución **CC BY 4.0**:
+[Humanitarian Data Exchange](https://data.humdata.org/dataset/kontur-population-mexico).
+Las demás capas y observaciones conservan las condiciones de uso de sus
+fuentes originales; revisa esas licencias antes de redistribuir los datos
+descargados.
