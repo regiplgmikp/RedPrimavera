@@ -95,15 +95,24 @@ def cargar_caminos(path_input: str, tipo_default: str) -> gpd.GeoDataFrame:
     return gdf
 
 
-def filtrar_dentro_del_poligono(gdf: gpd.GeoDataFrame, poligono) -> gpd.GeoDataFrame:
+def filtrar_cerca_del_poligono(gdf: gpd.GeoDataFrame, poligono, margen_km: float) -> gpd.GeoDataFrame:
+    """Conserva los caminos que tocan el polígono ampliado con un margen (en km).
+    Un camino que cruza el borde del bosque se conserva completo: son justo los
+    accesos que explican la exposición de las celdas del límite."""
     antes = len(gdf)
-    dentro = gdf[gdf.geometry.within(poligono)].reset_index(drop=True)
-    descartados = antes - len(dentro)
-    print(
-        f"Filtro de cobertura: {len(dentro)}/{antes} caminos 100% dentro del polígono "
-        f"({descartados} descartados por cruzar el borde o quedar fuera)"
+    zona = (
+        gpd.GeoSeries([poligono], crs="EPSG:4326")
+        .to_crs(CRS_METRICO_JALISCO)
+        .buffer(margen_km * 1000)
+        .to_crs("EPSG:4326")
+        .iloc[0]
     )
-    return dentro
+    cerca = gdf[gdf.geometry.intersects(zona)].reset_index(drop=True)
+    print(
+        f"Filtro de cobertura: {len(cerca)}/{antes} caminos dentro del polígono o a menos de "
+        f"{margen_km:g} km de su borde ({antes - len(cerca)} descartados por quedar más lejos)"
+    )
+    return cerca
 
 
 def cargar_caminos_a_neo4j(uri, user, password, gdf: gpd.GeoDataFrame):
@@ -211,6 +220,12 @@ def main():
     parser.add_argument("--user", default=os.getenv("NEO4J_USER", "neo4j"))
     parser.add_argument("--password", default=os.getenv("NEO4J_PASSWORD"))
     parser.add_argument("--resolucion", type=int, default=8)
+    parser.add_argument(
+        "--margen-km",
+        type=float,
+        default=5.0,
+        help="Margen alrededor del polígono en el que se conservan caminos (default 5 km; 0 = solo los que tocan el polígono)",
+    )
     args = parser.parse_args()
 
     print(f"Cargando polígono del BLP desde {args.geojson_blp} ...")
@@ -219,9 +234,9 @@ def main():
     gdf = cargar_caminos(args.input, args.tipo)
     print(f"{len(gdf)} features leídas de {args.input}")
 
-    gdf = filtrar_dentro_del_poligono(gdf, poligono)
+    gdf = filtrar_cerca_del_poligono(gdf, poligono, args.margen_km)
     if len(gdf) == 0:
-        sys.exit("No quedó ningún camino 100% dentro del polígono. Nada que cargar.")
+        sys.exit("No quedó ningún camino cerca del polígono. Nada que cargar.")
 
     cargar_caminos_a_neo4j(args.uri, args.user, args.password, gdf)
     calcular_cercania_a_celdas(args.uri, args.user, args.password, gdf, args.resolucion)
