@@ -11,7 +11,7 @@ export const CAMPOS_COLOR = {
   frecuencia_incendios: { etiqueta: 'Frecuencia de incendios (por año)', paleta: RIESGO, valor: (c) => c.frecuencia_incendios },
   intermediacion_norm: { etiqueta: 'Intermediación (cuello de botella)', paleta: VIRIDIS, valor: (c) => c.metricas.intermediacion_norm },
   cercania_norm: { etiqueta: 'Cercanía (centralidad)', paleta: VIRIDIS, valor: (c) => c.metricas.cercania_norm },
-  n_observaciones: { etiqueta: 'Número de observaciones', paleta: VIRIDIS, valor: (c) => c.n_observaciones },
+  n_observaciones: { etiqueta: 'Número de observaciones', paleta: VIRIDIS, valor: (c) => c.n_observaciones, escala: 'log', cero_sin_dato: true },
   componente: { etiqueta: 'Bloque conectado', categorico: true, valor: (c) => c.metricas.componente },
   ndvi: { etiqueta: 'NDVI medio (vigor de la vegetación)', paleta: VIRIDIS, valor: (c) => c.ndvi },
   dosel: { etiqueta: 'Altura media del dosel (m)', paleta: VIRIDIS, valor: (c) => c.dosel },
@@ -27,8 +27,8 @@ export function rangoDe(celdas, campo) {
 export function colorCelda(celda, campo, [lo, hi], alpha = 215) {
   const def = CAMPOS_COLOR[campo];
   const v = def.valor(celda);
-  if (v == null || !Number.isFinite(v)) return hexARgb(SIN_DATO, alpha);
-  if (def.categorico) return hexARgb(colorCategorico(v), alpha);
+  if (v == null || !Number.isFinite(v) || (def.cero_sin_dato && v === 0)) return hexARgb(SIN_DATO, alpha);
+  if (def.escala === 'log') return hexARgb(rampa(def.paleta, hi <= 0 ? 0 : Math.log1p(v) / Math.log1p(hi)), alpha);
   return hexARgb(rampa(def.paleta, hi === lo ? 0.5 : (v - lo) / (hi - lo)), alpha);
 }
 
