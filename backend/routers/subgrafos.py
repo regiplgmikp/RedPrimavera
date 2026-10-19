@@ -247,7 +247,8 @@ def subgrafo_especies(
     return SubgrafoEspecies(
         filtros={**filtro.aplicados(), **({"zona": zona} if zona else {}),
                  **({"categoria": categoria} if categoria else {}),
-                 "min_celdas_compartidas": min_celdas_compartidas},
+                 "min_celdas_compartidas": G.graph.get("umbral_efectivo", min_celdas_compartidas),
+                 "min_celdas_solicitado": min_celdas_compartidas},
         meta=res["meta"], nodos=nodos,
         aristas=[AristaPeso(source=a, target=b, peso=w) for a, b, w in res["aristas"]],
     )

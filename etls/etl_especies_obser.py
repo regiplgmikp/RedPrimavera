@@ -22,6 +22,7 @@ Notas:
             propiedad para cruces posteriores con catalogos taxonomicos.
         - Es idempotente para los identificadores existentes porque usa MERGE.
 """
+import csv
 import argparse
 import json
 import sys
@@ -164,9 +165,116 @@ def cargar_csv(path_csv: str, ring_nucleo: list = None, ring_mab: list = None) -
     else:
         df["zona"] = None
         print("AVISO: no se proporcionó polígono del BLP; zona quedará null para todas las filas.")
+# Llaves de GBIF de las dos fuentes grandes
+DATASET_EBIRD = "4fa7b334-ce0d-4e88-aaae-2e0c138d049e"
+DATASET_INAT = "50c9509d-22c7-4a22-a47d-8c48425ef4a7"
+MAX_INCERTIDUMBRE_M = 500   # ~ arista de una celda res 8
+ANIO_MINIMO = 2000
 
+CLASES_ICONICAS = {"Aves", "Mammalia", "Reptilia", "Amphibia", "Insecta",
+                   "Arachnida", "Actinopterygii", "Mollusca"}
+
+
+def _iconic_desde_gbif(kingdom, clase):
+    if clase in CLASES_ICONICAS:
+        return clase
+    if kingdom in ("Plantae", "Fungi", "Protozoa"):
+        return kingdom
+    if kingdom == "Animalia":
+        return "Animalia"
+    return "Unknown"
+
+
+def _fuente_desde_gbif(row):
+    if row["datasetKey"] == DATASET_EBIRD:
+        return "eBird"
+    if row["datasetKey"] == DATASET_INAT:
+        return "iNaturalist"
+    inst = row["institutionCode"] if isinstance(row["institutionCode"], str) else "GBIF"
+    return f"Colección {inst}" if row["basisOfRecord"] == "PRESERVED_SPECIMEN" else f"GBIF {inst}"
+
+
+def cargar_gbif(path_txt: str, ring_nucleo: list = None, ring_mab: list = None,
+                limite: int = None) -> pd.DataFrame:
+    cols = ["gbifID", "occurrenceID", "datasetKey", "basisOfRecord", "institutionCode",
+            "decimalLatitude", "decimalLongitude", "coordinateUncertaintyInMeters",
+            "species", "speciesKey", "kingdom", "class", "eventDate", "year",
+            "vernacularName"]
+    df = pd.read_csv(path_txt, sep="\t", quoting=csv.QUOTE_NONE, usecols=cols,
+                     low_memory=False, dtype=str)
+    print(f"GBIF leído: {len(df)} filas")
+
+    # 1) debe llegar a especie y tener coordenadas
+    antes = len(df)
+    df = df.dropna(subset=["decimalLatitude", "decimalLongitude", "species", "speciesKey"])
+    print(f"Con especie y coordenadas: {antes} -> {len(df)}")
+
+    # 2) incertidumbre vacía (eBird) o <= 500 m
+    antes = len(df)
+    inc = pd.to_numeric(df["coordinateUncertaintyInMeters"], errors="coerce")
+    df = df[inc.isna() | (inc <= MAX_INCERTIDUMBRE_M)].copy()
+    print(f"Incertidumbre vacía o <= {MAX_INCERTIDUMBRE_M} m: {antes} -> {len(df)}")
+
+    # 3) año >= 2000 (sin año se descarta)
+    antes = len(df)
+    anio = pd.to_numeric(df["year"], errors="coerce")
+    df = df[anio >= ANIO_MINIMO].copy()
+    print(f"Año >= {ANIO_MINIMO}: {antes} -> {len(df)}")
+
+    # Mismos nombres de columna que el CSV de iNaturalist
+    df["latitude"] = pd.to_numeric(df["decimalLatitude"])
+    df["longitude"] = pd.to_numeric(df["decimalLongitude"])
+    df["scientific_name"] = df["species"]
+    df["taxon_id"] = df["speciesKey"].astype(str)
+    df["common_name"] = df["vernacularName"]
+    # iNaturalist: usar su id original para que MERGE no duplique lo ya cargado
+    es_inat = df["datasetKey"] == DATASET_INAT
+    df["id"] = df["gbifID"].where(~es_inat, df["occurrenceID"].str.rsplit("/", n=1).str[-1])
+    df["uuid"] = df["gbifID"]
+    df["observed_on"] = df["eventDate"].str[:10]
+    df["iconic_taxon_name"] = [_iconic_desde_gbif(k, c) for k, c in zip(df["kingdom"], df["class"])]
+    df["url"] = "https://www.gbif.org/occurrence/" + df["gbifID"]
+    df.loc[es_inat, "url"] = df.loc[es_inat, "occurrenceID"]
+    df["image_url"] = None
+    df["fuente"] = df.apply(_fuente_desde_gbif, axis=1)
+    df["categoria"] = df["iconic_taxon_name"].apply(categoria_desde_iconic)
+
+    if limite:
+        df = df.sample(n=min(limite, len(df)), random_state=1).copy()
+
+    if ring_nucleo is not None:
+        df["zona"] = df.apply(
+            lambda r: clasificar_zona(r["longitude"], r["latitude"], ring_nucleo, ring_mab),
+            axis=1)
+    else:
+        df["zona"] = None
+
+    print("\nPor fuente (top 6):")
+    print(df["fuente"].value_counts().head(6).to_string())
+    print("\nPor zona:"); print(df["zona"].value_counts(dropna=False).to_string())
+    print("\nPor categoría:"); print(df["categoria"].value_counts().to_string())
     return df
 
+def filtrar_a_celdas_existentes(df, uri, user, password, resoluciones):
+    """Deja solo las observaciones cuyas celdas H3 ya existen en Neo4j."""
+    df = calcular_celdas_h3(df, resoluciones)
+    driver = get_driver(uri, user, password)
+    mascara = pd.Series(True, index=df.index)
+    with driver.session() as session:
+        for res in resoluciones:
+            ids = {r["h3_id"] for r in session.run(
+                "MATCH (c:CeldaH3 {resolucion: $res}) RETURN c.h3_id AS h3_id", res=res)}
+            print(f"Resolución {res}: {len(ids)} celdas en Neo4j")
+            mascara &= df[f"h3_res{res}"].isin(ids)
+    driver.close()
+
+    antes = len(df)
+    df = df[mascara].copy()
+    print(f"\nDentro de la rejilla existente: {antes} -> {len(df)}")
+    print("\nPor zona:"); print(df["zona"].value_counts().to_string())
+    print("\nPor fuente (top 6):"); print(df["fuente"].value_counts().head(6).to_string())
+    print(f"\nCeldas res 8 con al menos 1 observación: {df['h3_res8'].nunique()}")
+    return df
 
 def calcular_celdas_h3(df: pd.DataFrame, resoluciones: Iterable[int]) -> pd.DataFrame:
     for res in resoluciones:
@@ -194,7 +302,7 @@ def construir_registros(df: pd.DataFrame, resoluciones: list) -> list:
                 "obs_id": str(row["id"]),
                 "uuid": row.get("uuid"),
                 "fecha": str(row["observed_on"]) if pd.notna(row.get("observed_on")) else None,
-                "fuente": "iNaturalist",
+                "fuente": row.get("fuente", "iNaturalist"),
                 "lat": float(row["latitude"]),
                 "lon": float(row["longitude"]),
                 "categoria": row["categoria"],
@@ -219,21 +327,21 @@ MERGE (e:Especie {nombre_cientifico: row.nombre_cientifico})
     e.estatus_conservacion = null,
     e.endemica = null
   SET
-    e.taxon_id = row.taxon_id,
-    e.nombre_comun = row.nombre_comun,
-    e.reino_iconico = row.reino_iconico
+    e.taxon_id = coalesce(e.taxon_id, row.taxon_id),
+    e.nombre_comun = coalesce(e.nombre_comun, row.nombre_comun),
+    e.reino_iconico = coalesce(e.reino_iconico, row.reino_iconico)
 
 MERGE (o:Observacion {id: row.obs_id})
   SET
-    o.uuid = row.uuid,
+    o.uuid = coalesce(o.uuid, row.uuid),
     o.fecha = row.fecha,
     o.fuente = row.fuente,
     o.lat = row.lat,
     o.lon = row.lon,
     o.categoria = row.categoria,
     o.zona = row.zona,
-    o.url = row.url,
-    o.image_url = row.image_url
+    o.url = coalesce(row.url, o.url),
+    o.image_url = coalesce(row.image_url, o.image_url)
 
 MERGE (o)-[:PERTENECE_A]->(e)
 
@@ -304,7 +412,11 @@ def generar_adyacencias_h3(uri, user, password, resoluciones):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--csv", required=True, help="Ruta al CSV de Naturalista/iNaturalist")
+        
+    parser.add_argument("--csv", default=None, help="Ruta al CSV de Naturalista/iNaturalist")
+    parser.add_argument("--gbif", default=None, help="Ruta a occurrence.txt de GBIF (Darwin Core)")
+    parser.add_argument("--limite", type=int, default=None, help="Solo pruebas: usa una muestra al azar de GBIF")
+    
     parser.add_argument(
         "--geojson-blp",
         default=None,
@@ -341,8 +453,15 @@ def main():
         print(f"Cargando zonificación MAB desde {args.geojson_mab} ...")
         ring_mab = cargar_poligono_geojson(args.geojson_mab)
 
-    print(f"Leyendo {args.csv} ...")
-    df = cargar_csv(args.csv, ring_nucleo, ring_mab)
+    if args.gbif:
+        print(f"Leyendo GBIF {args.gbif} ...")
+        df = cargar_gbif(args.gbif, ring_nucleo, ring_mab, limite=args.limite)
+        df = filtrar_a_celdas_existentes(df, args.uri, args.user, args.password, args.resoluciones)
+    elif args.csv:
+        print(f"Leyendo {args.csv} ...")
+        df = cargar_csv(args.csv, ring_nucleo, ring_mab)
+    else:
+        sys.exit("Indica --csv o --gbif")
     print(f"{len(df)} observaciones válidas tras limpieza")
 
     print(f"Calculando celdas H3 en resoluciones {args.resoluciones} ...")

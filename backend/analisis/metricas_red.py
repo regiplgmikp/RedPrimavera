@@ -126,11 +126,17 @@ def metricas_celdas(celdas: list[dict], aristas: list[tuple[str, str]],
 # Red de especies por co-ocurrencia
 # ---------------------------------------------------------------------------
 
+MAX_ARISTAS_RED = 20000   # tope para que la red se pueda calcular y dibujar
+
+
 def red_cooccurrencia(pares_celda_especie: list[tuple[str, str]],
-                      min_celdas_compartidas: int = 1) -> nx.Graph:
+                      min_celdas_compartidas: int = 1,
+                      max_aristas: int = MAX_ARISTAS_RED) -> nx.Graph:
     """
     pares_celda_especie: [(h3_id, especie), ...] (se deduplican).
     Arista entre dos especies = nº de celdas del filtro donde ambas aparecen.
+    Si el umbral pedido deja más de max_aristas aristas, se sube automáticamente
+    (se conservan las más fuertes); el umbral usado queda en G.graph["umbral_efectivo"].
     """
     por_celda: dict[str, set[str]] = {}
     for h3_id, especie in pares_celda_especie:
@@ -141,14 +147,20 @@ def red_cooccurrencia(pares_celda_especie: list[tuple[str, str]],
         for a, b in combinations(sorted(especies), 2):
             pesos[(a, b)] += 1
 
+    umbral = min_celdas_compartidas
+    valores = [w for w in pesos.values() if w >= umbral]
+    if len(valores) > max_aristas:
+        valores.sort(reverse=True)
+        umbral = valores[max_aristas] + 1   # deja a lo más max_aristas aristas
+
     G = nx.Graph()
     for especies in por_celda.values():
         G.add_nodes_from(especies)
     for (a, b), w in pesos.items():
-        if w >= min_celdas_compartidas:
+        if w >= umbral:
             G.add_edge(a, b, peso=w)
+    G.graph["umbral_efectivo"] = umbral
     return G
-
 
 def metricas_especies(G: nx.Graph, max_exacto=800, k=K_MUESTRA) -> dict:
     n = G.number_of_nodes()
