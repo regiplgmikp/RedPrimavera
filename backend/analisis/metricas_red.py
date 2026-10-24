@@ -38,8 +38,13 @@ from __future__ import annotations
 
 from collections import Counter
 from itertools import combinations
+import time
 
 import networkx as nx
+
+import numpy as np
+from scipy.sparse.csgraph import shortest_path
+np = None
 
 SEMILLA = 42
 MAX_EXACTO = 1500      # hasta aquí, intermediación exacta
@@ -71,6 +76,25 @@ def _intermediacion(G: nx.Graph, weight=None, max_exacto=MAX_EXACTO, k=K_MUESTRA
 # Red de celdas
 # ---------------------------------------------------------------------------
 
+def _cercania(G: nx.Graph) -> dict:
+    """Cercanía exacta, igual que nx.closeness_centrality (con wf_improved),
+    pero calculada con scipy para que no tarde segundos."""
+    n = G.number_of_nodes()
+    if n == 0:
+        return {}
+    if np is None:
+        return nx.closeness_centrality(G)
+    nodos = list(G.nodes)
+    A = nx.to_scipy_sparse_array(G, nodelist=nodos, weight=None, format="csr")
+    D = shortest_path(A, method="D", directed=False, unweighted=True)
+    alcanzable = np.isfinite(D)
+    n_alc = alcanzable.sum(axis=1)              # incluye a la propia celda
+    suma = np.where(alcanzable, D, 0).sum(axis=1)
+    c = np.zeros(n)
+    ok = suma > 0
+    c[ok] = ((n_alc[ok] - 1) / suma[ok]) * ((n_alc[ok] - 1) / (n - 1))
+    return dict(zip(nodos, c.tolist()))
+
 def metricas_celdas(celdas: list[dict], aristas: list[tuple[str, str]],
                     max_exacto=MAX_EXACTO, k=K_MUESTRA) -> dict:
     """
@@ -86,9 +110,14 @@ def metricas_celdas(celdas: list[dict], aristas: list[tuple[str, str]],
             G.add_edge(a, b)
 
     grado = dict(G.degree())
+    t0 = time.perf_counter()
     interm, aprox = _intermediacion(G, None, max_exacto, k)
-    cercania = nx.closeness_centrality(G) if G.number_of_nodes() else {}
+    t1 = time.perf_counter()
+    cercania = _cercania(G)
+    t2 = time.perf_counter()
     articulaciones = set(nx.articulation_points(G)) if G.number_of_nodes() else set()
+    t3 = time.perf_counter()
+    print(f"   interm={t1-t0:.1f}s cercania={t2-t1:.1f}s articulaciones={t3-t2:.1f}s")
 
     componentes = sorted(nx.connected_components(G), key=len, reverse=True)
     comp_id, comp_tam = {}, {}

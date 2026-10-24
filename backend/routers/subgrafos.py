@@ -10,7 +10,7 @@ normalizadas a [0, 1]; no recalcula nada.
 """
 import time
 import unicodedata
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from ..analisis import metricas_red as mr
@@ -152,8 +152,16 @@ def _limpiar(x):
 
 
 # ---------------------------------------------------------------- endpoints
+TTL_CACHE_S = 600
+_CACHE_CELDAS = {}   # clave -> (momento, respuesta)
+
+
+def _clave_cache(request: Request) -> str:
+    return "&".join(sorted(request.url.query.split("&")))
+
 @router.get("/celdas", response_model=SubgrafoCeldas)
-def subgrafo_celdas(filtro: FiltroCeldas = Depends(filtros_dependency),
+def subgrafo_celdas(request: Request,
+                    filtro: FiltroCeldas = Depends(filtros_dependency),
                     session=Depends(get_session)):
     """
     Celdas que cumplen los filtros territoriales, conectadas por adyacencia, con
@@ -161,9 +169,16 @@ def subgrafo_celdas(filtro: FiltroCeldas = Depends(filtros_dependency),
     IVC alto (>= 0.7) y cerca de caminos (<= 500 m): la intermediación alta marca
     las que unen los focos de riesgo entre sí.
     """
+    clave = _clave_cache(request)
+    guardado = _CACHE_CELDAS.get(clave)
+    if guardado and time.time() - guardado[0] < TTL_CACHE_S:
+        return guardado[1]
+    
     if h3 is None:
         raise RuntimeError("Falta instalar h3 en el backend: pip install h3")
+    t0 = time.perf_counter()
     registros = [r.data() for r in session.run(consulta_nodos_celdas(filtro), parametros(filtro))]
+    t1 = time.perf_counter()
     if len(registros) > MAX_CELDAS:
         raise HTTPException(422, f"El filtro devuelve {len(registros)} celdas (máx {MAX_CELDAS}).")
 
@@ -173,7 +188,9 @@ def subgrafo_celdas(filtro: FiltroCeldas = Depends(filtros_dependency),
         aristas = [(r["source"], r["target"]) for r in session.run(
             CONSULTA_ARISTAS_CELDAS, resolucion=filtro.resolucion, ids=ids)]
 
+    t2 = time.perf_counter()
     res = mr.metricas_celdas(registros, aristas)
+    t3 = time.perf_counter()
     nodos = []
     for r in registros:
         boundary = [[lat, lon] for lat, lon in h3.cell_to_boundary(r["h3_id"])]
@@ -191,14 +208,22 @@ def subgrafo_celdas(filtro: FiltroCeldas = Depends(filtros_dependency),
             metricas=MetricasCelda(**res["metricas"][r["h3_id"]]),
         ))
     uniq = sorted({tuple(sorted(a)) for a in aristas})
-    return SubgrafoCeldas(
+    t4 = time.perf_counter()
+    print(f"[celdas res={filtro.resolucion}] nodos={t1-t0:.1f}s aristas={t2-t1:.1f}s "
+          f"metricas={t3-t2:.1f}s armar={t4-t3:.1f}s")
+    respuesta = SubgrafoCeldas(
         filtros=filtro.aplicados(), meta=res["meta"], nodos=nodos,
         aristas=[AristaSimple(source=a, target=b) for a, b in uniq],
     )
+    if len(_CACHE_CELDAS) >= 30:
+        _CACHE_CELDAS.clear()
+    _CACHE_CELDAS[clave] = (time.time(), respuesta)
+    return respuesta
 
-
+_CACHE_RED_ESPECIES = {}   # clave -> (momento, respuesta)
 @router.get("/especies", response_model=SubgrafoEspecies)
 def subgrafo_especies(
+    request: Request,
     filtro: FiltroCeldas = Depends(filtros_dependency),
     zona: str | None = Query(None, pattern="^(nucleo|zona_mab|fuera)$",
                              description="Solo observaciones de esa zona"),
@@ -213,6 +238,11 @@ def subgrafo_especies(
     (peso = nº de celdas compartidas). Responde preguntas como: ¿qué especies
     son más centrales en las zonas de alta vulnerabilidad?
     """
+    clave = _clave_cache(request)
+    guardado = _CACHE_RED_ESPECIES.get(clave)
+    if guardado and time.time() - guardado[0] < TTL_CACHE_S:
+        return guardado[1]
+    
     params = parametros(filtro)
     if zona:
         params["zona"] = zona
@@ -245,7 +275,7 @@ def subgrafo_especies(
             metricas=MetricasEspecie(**m),
         ))
     res["meta"]["n_celdas_filtro"] = len({p[0] for p in pares})
-    return SubgrafoEspecies(
+    respuesta = SubgrafoEspecies(
         filtros={**filtro.aplicados(), **({"zona": zona} if zona else {}),
                  **({"categoria": categoria} if categoria else {}),
                  "min_celdas_compartidas": G.graph.get("umbral_efectivo", min_celdas_compartidas),
@@ -253,6 +283,10 @@ def subgrafo_especies(
         meta=res["meta"], nodos=nodos,
         aristas=[AristaPeso(source=a, target=b, peso=w) for a, b, w in res["aristas"]],
     )
+    if len(_CACHE_RED_ESPECIES) >= 30:
+        _CACHE_RED_ESPECIES.clear()
+    _CACHE_RED_ESPECIES[clave] = (time.time(), respuesta)
+    return respuesta
 
 
 class CeldaObservada(BaseModel):
