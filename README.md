@@ -1,5 +1,7 @@
 # RedPrimavera
 
+> Documentación actualizada en octubre de 2026.
+
 RedPrimavera es una aplicación de análisis espacial y vulnerabilidad del
 Bosque La Primavera. Integra observaciones de biodiversidad, una malla H3,
 variables de vegetación, incendios, caminos, predios, instituciones y
@@ -56,7 +58,9 @@ RedPrimavera/
 │   └── neo4j_conn.py             # Conexión y verificación de Neo4j
 ├── frontend/                     # Aplicación React/Vite
 │   ├── src/
+│   ├── test/                     # Pruebas de lógica del cliente
 │   ├── package.json
+│   ├── package-lock.json
 │   └── .env.example
 ├── .env                          # Solo local; nunca versionar
 └── README.md
@@ -131,8 +135,11 @@ En otra terminal, desde la raíz del repositorio:
 ```powershell
 cd frontend
 Copy-Item .env.example .env
-npm install
+npm ci
 ```
+
+Usa `npm install` si necesitas actualizar intencionalmente
+`frontend/package-lock.json`.
 
 El archivo `frontend/.env` permite configurar la URL del backend:
 
@@ -334,17 +341,20 @@ antes de ejecutar este paso.
 
 ### 10. Cargar población de Kontur
 
-Descarga manualmente el GeoPackage de población de Kontur México desde
+Descarga manualmente el GeoPackage de **Kontur Population México** desde
 [Humanitarian Data Exchange](https://data.humdata.org/dataset/kontur-population-mexico)
-y guárdalo en `data/raw/`. El archivo no se incluye en el repositorio.
+y guárdalo en `data/raw/`. El archivo no se incluye en el repositorio. La
+descarga local actual puede llamarse `kontur_population_MX_20220630.gpkg`;
+el nombre no es fijo, así que usa la ruta real del archivo en cada
+instalación.
 El ETL carga la población únicamente en celdas H3 de resolución 8; no
-interpela datos hacia resolución 9.
+interpola datos hacia resolución 9.
 
 Primero revisa el resultado:
 
 ```powershell
 python etls/etl_poblacion_kontur.py `
-  --gpkg data/raw/kontur_population_MX.gpkg `
+  --gpkg data/raw/kontur_population_MX_20220630.gpkg `
   --dry-run
 ```
 
@@ -497,6 +507,10 @@ npm test
 npm run build
 ```
 
+`npm run dev` inicia Vite en modo desarrollo, `npm run build` genera la
+versión de producción en `frontend/dist/` y `npm run preview` permite
+servir esa compilación localmente.
+
 También hay scripts auxiliares para revisar la red y los datos:
 
 ```powershell
@@ -545,7 +559,9 @@ El proyecto ya permite:
 
 La relación `ACTUA_SOBRE` todavía no es creada por los ETL. La fórmula del IVC
 ya está implementada, pero requiere que las variables de entrada estén
-disponibles para que una celda reciba un valor completo.
+disponibles para que una celda reciba un valor completo. La población de
+Kontur permanece en su resolución nativa (H3 8), y las métricas de red se
+recalculan sobre el subconjunto filtrado que solicita cada consulta.
 
 ## Licencias y atribuciones de datos
 
