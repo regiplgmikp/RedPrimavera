@@ -91,7 +91,7 @@ En Windows PowerShell:
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install pandas geopandas shapely pyogrio osmnx h3 neo4j networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api pytest
+python -m pip install pandas geopandas shapely pyogrio osmnx h3 neo4j networkx scipy python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api pytest
 ```
 
 Si PowerShell impide activar el entorno:
@@ -107,7 +107,7 @@ En Linux/macOS:
 python3 -m venv venv
 source venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install pandas geopandas shapely pyogrio osmnx h3 neo4j networkx python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api pytest
+python -m pip install pandas geopandas shapely pyogrio osmnx h3 neo4j networkx scipy python-dotenv certifi fastapi "uvicorn[standard]" pydantic earthengine-api pytest
 ```
 
 ## Configuración
