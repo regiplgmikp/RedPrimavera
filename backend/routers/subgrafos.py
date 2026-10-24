@@ -176,9 +176,7 @@ def subgrafo_celdas(request: Request,
     
     if h3 is None:
         raise RuntimeError("Falta instalar h3 en el backend: pip install h3")
-    t0 = time.perf_counter()
     registros = [r.data() for r in session.run(consulta_nodos_celdas(filtro), parametros(filtro))]
-    t1 = time.perf_counter()
     if len(registros) > MAX_CELDAS:
         raise HTTPException(422, f"El filtro devuelve {len(registros)} celdas (máx {MAX_CELDAS}).")
 
@@ -187,10 +185,7 @@ def subgrafo_celdas(request: Request,
     if ids:
         aristas = [(r["source"], r["target"]) for r in session.run(
             CONSULTA_ARISTAS_CELDAS, resolucion=filtro.resolucion, ids=ids)]
-
-    t2 = time.perf_counter()
     res = mr.metricas_celdas(registros, aristas)
-    t3 = time.perf_counter()
     nodos = []
     for r in registros:
         boundary = [[lat, lon] for lat, lon in h3.cell_to_boundary(r["h3_id"])]
@@ -208,9 +203,6 @@ def subgrafo_celdas(request: Request,
             metricas=MetricasCelda(**res["metricas"][r["h3_id"]]),
         ))
     uniq = sorted({tuple(sorted(a)) for a in aristas})
-    t4 = time.perf_counter()
-    print(f"[celdas res={filtro.resolucion}] nodos={t1-t0:.1f}s aristas={t2-t1:.1f}s "
-          f"metricas={t3-t2:.1f}s armar={t4-t3:.1f}s")
     respuesta = SubgrafoCeldas(
         filtros=filtro.aplicados(), meta=res["meta"], nodos=nodos,
         aristas=[AristaSimple(source=a, target=b) for a, b in uniq],

@@ -35,13 +35,10 @@ fija (resultado reproducible). El campo `aproximada` de los metadatos lo indica.
 """
 
 from __future__ import annotations
-
 from collections import Counter
 from itertools import combinations
-import time
 
 import networkx as nx
-
 import numpy as np
 from scipy.sparse.csgraph import shortest_path
 np = None
@@ -110,15 +107,9 @@ def metricas_celdas(celdas: list[dict], aristas: list[tuple[str, str]],
             G.add_edge(a, b)
 
     grado = dict(G.degree())
-    t0 = time.perf_counter()
     interm, aprox = _intermediacion(G, None, max_exacto, k)
-    t1 = time.perf_counter()
     cercania = _cercania(G)
-    t2 = time.perf_counter()
     articulaciones = set(nx.articulation_points(G)) if G.number_of_nodes() else set()
-    t3 = time.perf_counter()
-    print(f"   interm={t1-t0:.1f}s cercania={t2-t1:.1f}s articulaciones={t3-t2:.1f}s")
-
     componentes = sorted(nx.connected_components(G), key=len, reverse=True)
     comp_id, comp_tam = {}, {}
     for i, comp in enumerate(componentes):
