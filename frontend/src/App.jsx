@@ -22,6 +22,16 @@ const CLAVE_BIENVENIDA = 'redprimavera.bienvenida.vista';
 const yaVioBienvenida = () => {
   try { return localStorage.getItem(CLAVE_BIENVENIDA) === '1'; } catch { return false; }
 };
+const ANCHO_MIN = 260;
+const ANCHO_MAX = 560;
+const ANCHO_INICIAL = 300;
+const CLAVE_ANCHO = 'redprimavera.ancho.panel';
+const anchoGuardado = () => {
+  try {
+    const n = Number(localStorage.getItem(CLAVE_ANCHO));
+    return n >= ANCHO_MIN && n <= ANCHO_MAX ? n : ANCHO_INICIAL;
+  } catch { return ANCHO_INICIAL; }
+};
 
 export default function App() {
   const [form, setForm] = useState(FILTROS_VACIOS);        // lo que se está editando
@@ -40,6 +50,30 @@ export default function App() {
     setBienvenida(false);
     try { localStorage.setItem(CLAVE_BIENVENIDA, '1'); } catch { /* sin almacenamiento: no pasa nada */ }
   }, []);
+    const [ancho, setAncho] = useState(anchoGuardado);
+  const [arrastrando, setArrastrando] = useState(false);
+  useEffect(() => {
+    try { localStorage.setItem(CLAVE_ANCHO, String(ancho)); } catch { /* sin almacenamiento */ }
+  }, [ancho]);
+
+  const arrastrar = useCallback((e) => {
+    e.preventDefault();
+    setArrastrando(true);
+    const mover = (ev) => setAncho(Math.min(ANCHO_MAX, Math.max(ANCHO_MIN, ev.clientX)));
+    const soltar = () => {
+      window.removeEventListener('pointermove', mover);
+      window.removeEventListener('pointerup', soltar);
+      document.body.style.userSelect = '';
+      setArrastrando(false);
+    };
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', mover);
+    window.addEventListener('pointerup', soltar);
+  }, []);
+  const teclado = (e) => {
+    if (e.key === 'ArrowLeft') setAncho((a) => Math.max(ANCHO_MIN, a - 16));
+    if (e.key === 'ArrowRight') setAncho((a) => Math.min(ANCHO_MAX, a + 16));
+  };
 
   const resolucion = vista.autoRes && encuadre ? (encuadre.zoom >= ZOOM_PARA_RES_9 ? 9 : 8) : vista.resolucion;
   const bboxParam = vista.dinamico && encuadre ? bboxTexto(encuadre.bbox) : '';
@@ -144,7 +178,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app">
+    <div className="app" style={{ '--ancho-panel': `${ancho}px` }}>
       <header>
         <h1>RedPrimavera</h1>
         <span className="sub">Vulnerabilidad y biodiversidad · Bosque La Primavera</span>
@@ -167,6 +201,13 @@ export default function App() {
         omitidos={sobreposicion?.omitidos}
         especieSel={especieSeleccionada} avisoEspecie={avisoEspecie}
         onElegirEspecie={(id) => elegir({ tipo: 'especie', id })} onQuitarEspecie={() => elegir(null)}
+      />
+      <div
+        className={`divisor${arrastrando ? ' activo' : ''}`}
+        role="separator" aria-orientation="vertical" aria-label="Ancho del panel de filtros"
+        aria-valuenow={ancho} aria-valuemin={ANCHO_MIN} aria-valuemax={ANCHO_MAX}
+        tabIndex={0} title="Arrastra para cambiar el ancho (doble clic para restablecer)"
+        onPointerDown={arrastrar} onKeyDown={teclado} onDoubleClick={() => setAncho(ANCHO_INICIAL)}
       />
       <main className="paneles" data-disposicion={vista.disposicion}>
         <MapPanel

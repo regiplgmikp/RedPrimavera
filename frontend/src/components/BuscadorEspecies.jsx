@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { buscarEspecies } from '../api.js';
+import Ayuda from './Ayuda.jsx';
 
 const VACIO = { lista: [], total: 0, cargando: false, error: null };
 
@@ -27,7 +28,11 @@ export default function BuscadorEspecies({ seleccionada, aviso, onElegir, onQuit
 
   return (
     <div className="buscador">
-      <label htmlFor="buscar-especie">Buscar especie (nombre común o científico)</label>
+      <label htmlFor="buscar-especie">Buscar especie (nombre común o científico)
+        <Ayuda titulo="Buscar especie">
+          Escribe al menos dos letras del nombre común (por ejemplo, «carpintero») o del nombre científico. Al elegir una especie, el mapa ilumina las zonas donde se ha observado. Algunos nombres comunes están en inglés; si no aparece, prueba con el nombre científico. Si la especie no tiene conexiones con las demás en el grafo, no se dibuja ahí, pero el mapa sí muestra sus zonas.
+        </Ayuda>
+      </label>
       <input id="buscar-especie" type="search" autoComplete="off" placeholder="p. ej. carpintero, mosquero…"
         value={texto} onChange={(e) => { setTexto(e.target.value); setAbierto(true); }} onFocus={() => setAbierto(true)} />
       {mostrar && (
