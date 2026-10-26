@@ -6,6 +6,7 @@ import { datosSobreposicion, grafoCeldas, grafoEspecies, subgrafoDeEspecies } fr
 import FilterPanel from './components/FilterPanel.jsx';
 import MapPanel from './components/MapPanel.jsx';
 import GraphPanel from './components/GraphPanel.jsx';
+import Bienvenida from './components/Bienvenida.jsx';
 
 export const FILTROS_VACIOS = {
   ivc_min: '', ivc_max: '', frecuencia_min: '', distancia_camino_max: '', en_predio: '',
@@ -16,6 +17,11 @@ const VISTA_INICIAL = {
   dinamico: false, autoRes: false, grafo: 'especies', colorGrafo: 'taxonomia', tamanoGrafo: 'intermediacion_norm',
 };
 const esAbort = (e) => e?.name === 'AbortError';
+
+const CLAVE_BIENVENIDA = 'redprimavera.bienvenida.vista';
+const yaVioBienvenida = () => {
+  try { return localStorage.getItem(CLAVE_BIENVENIDA) === '1'; } catch { return false; }
+};
 
 export default function App() {
   const [form, setForm] = useState(FILTROS_VACIOS);        // lo que se está editando
@@ -29,6 +35,11 @@ export default function App() {
   const [celdaFoco, setCeldaFoco] = useState(null);         // celda cuyas especies se muestran en el grafo
   const [especiesCelda, setEspeciesCelda] = useState({ id: null, datos: null, cargando: false, error: null });
   const [observaciones, setObservaciones] = useState({ id: null, datos: null, cargando: false, error: null });
+    const [bienvenida, setBienvenida] = useState(() => !yaVioBienvenida());
+  const cerrarBienvenida = useCallback(() => {
+    setBienvenida(false);
+    try { localStorage.setItem(CLAVE_BIENVENIDA, '1'); } catch { /* sin almacenamiento: no pasa nada */ }
+  }, []);
 
   const resolucion = vista.autoRes && encuadre ? (encuadre.zoom >= ZOOM_PARA_RES_9 ? 9 : 8) : vista.resolucion;
   const bboxParam = vista.dinamico && encuadre ? bboxTexto(encuadre.bbox) : '';
@@ -139,6 +150,8 @@ export default function App() {
         <span className="sub">Vulnerabilidad y biodiversidad · Bosque La Primavera</span>
         <span className="estado" role="status" aria-live="polite">
           {celdas.cargando ? 'Cargando…' : celdas.datos ? `${celdas.datos.nodos.length} celdas · resolución ${resolucion}` : 'Sin datos'}
+          <button className="ayuda-btn" onClick={() => setBienvenida(true)}
+                aria-label="Ver la bienvenida y la ayuda" title="¿Qué es esto?">?</button>
         </span>
       </header>
       <FilterPanel
@@ -165,6 +178,7 @@ export default function App() {
           seleccion={seleccion} onSelect={elegir}
         />
       </main>
+            {bienvenida && <Bienvenida onCerrar={cerrarBienvenida} />}
     </div>
   );
 }
