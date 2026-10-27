@@ -8,8 +8,6 @@ import MapPanel from './components/MapPanel.jsx';
 import GraphPanel from './components/GraphPanel.jsx';
 import Bienvenida from './components/Bienvenida.jsx';
 import { iniciarRecorrido } from './recorrido.js';
-// TEMPORAL: permite probar paletas con ?paleta=a|b|c|d en la dirección
-document.documentElement.dataset.paleta = new URLSearchParams(window.location.search).get('paleta') || '';
 
 export const FILTROS_VACIOS = {
   ivc_min: '', ivc_max: '', frecuencia_min: '', distancia_camino_max: '', en_predio: '',
