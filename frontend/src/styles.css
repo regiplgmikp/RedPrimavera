@@ -1,6 +1,6 @@
-:root { --bg:#fff8f8; --panel:#f9f7f7; --ink:#351710; --muted:#621711; --line:#661a31; --accent:#8e3a27; --on-accent:#FFFEF4; --alt:#BA1B18; --hdr-bg:#60222d; --hdr-ink:#fce9f4; }
+:root { --bg:#fff8f8; --panel:#f9f7f7; --ink:#351710; --muted:#621711; --line:#661a31; --accent:#8e3a27; --on-accent:#FFFEF4; --alt:#BA1B18; --hdr-bg:#60222d; --hdr-ink:#fce9f4; --focus:#BA1B18; }
 @media (prefers-color-scheme: dark) {
-  :root{ --bg:#000000; --panel:#000000; --ink:#faf1f3; --muted:#faf1f3; --line:#552a37; --accent:#EA8871; --on-accent:#2A110C; --alt:#EA8871; --hdr-bg:#1E0B07; --hdr-ink:#f2ced6; }
+  :root{ --bg:#000000; --panel:#000000; --ink:#faf1f3; --muted:#faf1f3; --line:#552a37; --accent:#EA8871; --on-accent:#2A110C; --alt:#EA8871; --hdr-bg:#1E0B07; --hdr-ink:#f2ced6; --focus:#F09A86;}
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -43,6 +43,7 @@ button.secundario { background: transparent; color: var(--accent); width: 100%; 
 .msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--muted); z-index: 2; background: color-mix(in srgb, var(--bg) 85%, transparent); white-space: pre-line; pointer-events: none; }
 .aviso-flotante { position: absolute; top: 44px; left: 12px; z-index: 3; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; max-width: 70%; }
 .info { position: absolute; right: 12px; bottom: 26px; z-index: 3; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font-size: 12px; max-width: 45%; }
+
 /* Buscador de especies */
 input[type=search] { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; }
 input[type=search]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
@@ -110,3 +111,10 @@ aside h2 { border-bottom: 2px solid var(--alt, transparent); padding-bottom: 3px
 .recorrido-carpi .driver-popover-arrow-side-right.driver-popover-arrow { border-right-color: var(--panel); }
 .recorrido-carpi .driver-popover-arrow-side-top.driver-popover-arrow { border-top-color: var(--panel); }
 .recorrido-carpi .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: var(--panel); }
+.driver-popover.recorrido-carpi { min-width: 320px; max-width: 380px; }
+.recorrido-carpi .recorrido-figura { float: left; margin: 0 12px 6px 0; }
+.recorrido-carpi .driver-popover-footer { clear: both; }
+/* Espera con Carpi */
+.cargando { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.espera-flotante { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 16px 8px 10px; color: var(--muted); font-size: 13px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); pointer-events: none; }
+.espera-flotante .cargando { flex-direction: row; gap: 10px; }

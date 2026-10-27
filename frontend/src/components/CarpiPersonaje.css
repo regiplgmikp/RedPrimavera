@@ -1,0 +1,263 @@
+.carpi-app {
+  --red: #e44750;
+  --ink: #25252d;
+  --cream: #fff8f0;
+  --gold: #f4c34f;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 16px;
+  font-family: system-ui, sans-serif;
+  text-align: center;
+  color: var(--ink);
+  background: var(--cream);
+  border-radius: 28px;
+  max-width: 420px;
+  margin: auto;
+}
+
+/* ---------- Selector de vista (frente / perfil) ---------- */
+.carpi-views {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  background: #f6e6de;
+}
+
+.carpi-views button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease;
+}
+
+.carpi-views button.active {
+  background: white;
+  color: var(--red);
+  font-weight: 600;
+}
+
+/* ---------- Escenario ---------- */
+.carpi-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #ffeee6;
+}
+
+.carpi-bird {
+  position: relative;
+  z-index: 1;
+  width: 82%;
+  overflow: visible;
+  animation: carpi-float 3s ease-in-out infinite;
+  transform-origin: 50% 70%;
+}
+
+/* Animación del cuerpo según la expresión */
+.carpi-stage.curiosa .carpi-bird {
+  animation: carpi-curious 2.4s ease-in-out infinite;
+}
+
+.carpi-stage.dormida .carpi-bird {
+  animation: carpi-sleep 4s ease-in-out infinite;
+}
+
+.carpi-stage.sorprendida .carpi-bird {
+  animation: carpi-jump 1.6s ease-in-out infinite;
+}
+
+/* Ala derecha (vista de frente) */
+.carpi-wing-r {
+  transform-box: view-box;
+  transform-origin: 162px 182px;
+  transition: transform 400ms ease;
+}
+
+.carpi-stage.senalando .carpi-wing-r {
+  transform: rotate(-95deg);
+  animation: carpi-point 1.2s ease-in-out infinite;
+}
+
+.carpi-stage.presentando .carpi-wing-r {
+  transform: rotate(-60deg);
+}
+
+/* Pico hablando */
+.carpi-jaw {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: carpi-talk 0.35s ease-in-out infinite alternate;
+}
+
+.carpi-jaw-side {
+  transform-box: fill-box;
+  transform-origin: 0 0;
+  animation: carpi-talk-side 0.35s ease-in-out infinite alternate;
+}
+
+/* Puntitos del globo de diálogo */
+.carpi-dot {
+  animation: carpi-blink 1s ease-in-out infinite;
+}
+
+.carpi-dot:nth-of-type(2) {
+  animation-delay: 0.2s;
+}
+
+.carpi-dot:nth-of-type(3) {
+  animation-delay: 0.4s;
+}
+
+/* Circulito de carga */
+.carpi-spinner {
+  transform-box: view-box;
+  transform-origin: 196px 62px;
+  animation: carpi-spin 1s linear infinite;
+}
+
+.carpi-zzz {
+  position: absolute;
+  top: 14%;
+  right: 15%;
+  color: #bd6c79;
+  font-weight: 800;
+  letter-spacing: 5px;
+  animation: carpi-zzz 2s ease-in-out infinite;
+}
+
+/* ---------- Textos ---------- */
+.carpi-app h2 {
+  margin: 4px 0 0;
+  font-size: 1.7rem;
+  letter-spacing: -0.7px;
+}
+
+.carpi-subtitle {
+  margin: 0 0 12px;
+  color: #82777a;
+  font-size: 0.95rem;
+}
+
+/* ---------- Botones de expresiones ---------- */
+.carpi-expressions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.carpi-expressions button {
+  padding: 10px 15px;
+  border: 1px solid #eaded7;
+  border-radius: 999px;
+  background: #fffdf9;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.carpi-expressions button:hover {
+  transform: translateY(-2px);
+}
+
+.carpi-expressions button.active {
+  background: var(--red);
+  border-color: var(--red);
+  color: white;
+}
+
+.carpi-expressions button:focus-visible,
+.carpi-views button:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+/* ---------- Animaciones ---------- */
+@keyframes carpi-float {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-7px) rotate(1deg); }
+}
+
+@keyframes carpi-curious {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-4px) rotate(3deg); }
+}
+
+@keyframes carpi-sleep {
+  0%, 100% { transform: translateY(2px) scale(0.99); }
+  50% { transform: translateY(5px) scale(1.01); }
+}
+
+@keyframes carpi-jump {
+  0%, 60%, 100% { transform: translateY(0); }
+  20% { transform: translateY(-12px); }
+  40% { transform: translateY(0); }
+}
+
+@keyframes carpi-point {
+  0%, 100% { transform: rotate(-95deg); }
+  50% { transform: rotate(-105deg); }
+}
+
+@keyframes carpi-talk {
+  from { transform: translateY(-4px); }
+  to { transform: translateY(1px); }
+}
+
+@keyframes carpi-talk-side {
+  from { transform: rotate(-3deg); }
+  to { transform: rotate(8deg); }
+}
+
+@keyframes carpi-blink {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+@keyframes carpi-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes carpi-zzz {
+  0%, 100% { opacity: 0.45; transform: translateY(5px); }
+  50% { opacity: 1; transform: translateY(-5px); }
+}
+
+/* ---------- Accesibilidad: menos movimiento ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .carpi-bird,
+  .carpi-zzz,
+  .carpi-wing-r,
+  .carpi-jaw,
+  .carpi-jaw-side,
+  .carpi-dot,
+  .carpi-spinner {
+    animation: none !important;
+  }
+
+  .carpi-expressions button,
+  .carpi-views button,
+  .carpi-wing-r {
+    transition: none;
+  }
+}
