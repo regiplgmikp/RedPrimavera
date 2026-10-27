@@ -60,10 +60,11 @@ export default function Bienvenida({ onCerrar, onRecorrido }) {
         </p>
 
         <div className="bienvenida-acciones">
-          <button ref={botonRef} className="primario" onClick={onCerrar}>Empezar</button>
           {onRecorrido && (
-            <button className="secundario" onClick={onRecorrido}>Hacer el recorrido</button>
-          )}
+            <button className="primario" onClick={onRecorrido}>Hacer el recorrido</button>
+          )
+          }
+          <button ref={botonRef} className="secundario" onClick={onCerrar}>Cerrar</button>
         </div>
         <p className="bienvenida-pie">Proyecto de aplicación profesional del ITESO.</p>
       </section>

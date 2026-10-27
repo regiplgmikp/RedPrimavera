@@ -1,8 +1,6 @@
-:root {
-  --bg:#f6f7f5; --panel:#ffffff; --ink:#1d2421; --muted:#5d6a64; --line:#dde2de; --accent:#1b6b55; --nodata:#c9cdca; --focus:#0b57d0;
-}
+:root { --bg:#fff8f8; --panel:#f9f7f7; --ink:#351710; --muted:#621711; --line:#661a31; --accent:#8e3a27; --on-accent:#FFFEF4; --alt:#BA1B18; --hdr-bg:#60222d; --hdr-ink:#fce9f4; }
 @media (prefers-color-scheme: dark) {
-  :root { --bg:#121714; --panel:#1b221e; --ink:#e8ece9; --muted:#9aa7a0; --line:#2c3630; --accent:#5fc3a5; --nodata:#3d4540; --focus:#8ab4f8; }
+  :root{ --bg:#000000; --panel:#000000; --ink:#faf1f3; --muted:#faf1f3; --line:#552a37; --accent:#EA8871; --on-accent:#2A110C; --alt:#EA8871; --hdr-bg:#1E0B07; --hdr-ink:#f2ced6; }
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -93,3 +91,8 @@ input[type=search]:focus-visible { outline: 2px solid var(--focus); outline-offs
 /* Lugar fijo de cada pieza en la cuadrícula de la página */
 aside { grid-column: 1; grid-row: 2; }
 .paneles { grid-column: 2; grid-row: 2; }
+
+.ayuda-nota { border-left-color: var(--alt, var(--accent)); }
+.seleccion-especie { border-color: var(--alt, var(--accent)); }
+.bienvenida-bloques h3 { color: var(--alt, var(--accent)); }
+aside h2 { border-bottom: 2px solid var(--alt, transparent); padding-bottom: 3px; display: inline-block; }
