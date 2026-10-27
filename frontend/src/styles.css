@@ -96,3 +96,17 @@ aside { grid-column: 1; grid-row: 2; }
 .seleccion-especie { border-color: var(--alt, var(--accent)); }
 .bienvenida-bloques h3 { color: var(--alt, var(--accent)); }
 aside h2 { border-bottom: 2px solid var(--alt, transparent); padding-bottom: 3px; display: inline-block; }
+
+
+/* Recorrido guiado (driver.js) */
+.driver-popover.recorrido-carpi { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; box-shadow: 0 16px 48px rgba(0, 0, 0, .35); }
+.recorrido-carpi .driver-popover-title { color: var(--alt, var(--accent)); font-size: 16px; font-weight: 650; }
+.recorrido-carpi .driver-popover-description { color: var(--ink); font-size: 13px; line-height: 1.5; }
+.recorrido-carpi .driver-popover-progress-text { color: var(--muted); font-size: 11px; }
+.recorrido-carpi .driver-popover-footer button { background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 6px 12px; font: inherit; font-weight: 600; text-shadow: none; }
+.recorrido-carpi .driver-popover-next-btn { background: var(--accent); color: var(--on-accent); }
+.recorrido-carpi .driver-popover-close-btn { color: var(--muted); }
+.recorrido-carpi .driver-popover-arrow-side-left.driver-popover-arrow { border-left-color: var(--panel); }
+.recorrido-carpi .driver-popover-arrow-side-right.driver-popover-arrow { border-right-color: var(--panel); }
+.recorrido-carpi .driver-popover-arrow-side-top.driver-popover-arrow { border-top-color: var(--panel); }
+.recorrido-carpi .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: var(--panel); }
