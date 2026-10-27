@@ -15,6 +15,39 @@ La aplicación trabaja principalmente con celdas H3 de resolución 8
 topológicas se calculan sobre el subconjunto que resulta de los filtros
 territoriales, no sobre toda la red.
 
+## Inicio rápido
+
+Para probar la aplicación con una base de Neo4j ya cargada:
+
+1. Instala las dependencias del backend y configura el archivo `.env` como se
+   explica en [Configuración](#configuración).
+2. Instala las dependencias del frontend:
+
+   ```powershell
+   cd frontend
+   npm ci
+   cd ..
+   ```
+
+3. En una terminal, desde la raíz del repositorio, inicia la API:
+
+   ```powershell
+   python -m uvicorn backend.main:app --reload
+   ```
+
+4. En otra terminal, inicia el frontend:
+
+   ```powershell
+   cd frontend
+   npm run dev
+   ```
+
+5. Abre <http://localhost:5173>. La API estará disponible en
+   <http://localhost:8000/docs>.
+
+Este flujo solo inicia los servicios. Si la base de datos aún no tiene datos,
+ejecuta primero el [flujo de carga recomendado](#flujo-de-carga-recomendado).
+
 ## Arquitectura
 
 ```text
@@ -471,6 +504,11 @@ Abre <http://localhost:5173>. La interfaz permite:
 - seleccionar una celda para consultar sus especies;
 - superponer el grafo territorial sobre el mapa y cambiar el tamaño/color de
   los nodos según sus métricas.
+
+La interfaz muestra una bienvenida la primera vez que se abre en un navegador.
+Desde esa ventana se puede iniciar el recorrido guiado; la preferencia se
+guarda localmente y puede restablecerse borrando los datos del sitio para
+`localhost:5173`.
 
 ## Verificación y diagnóstico
 

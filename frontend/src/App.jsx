@@ -7,6 +7,7 @@ import FilterPanel from './components/FilterPanel.jsx';
 import MapPanel from './components/MapPanel.jsx';
 import GraphPanel from './components/GraphPanel.jsx';
 import Bienvenida from './components/Bienvenida.jsx';
+import { iniciarRecorrido } from './recorrido.js';
 
 export const FILTROS_VACIOS = {
   ivc_min: '', ivc_max: '', frecuencia_min: '', distancia_camino_max: '', en_predio: '',
@@ -50,7 +51,11 @@ export default function App() {
     setBienvenida(false);
     try { localStorage.setItem(CLAVE_BIENVENIDA, '1'); } catch { /* sin almacenamiento: no pasa nada */ }
   }, []);
-    const [ancho, setAncho] = useState(anchoGuardado);
+    const hacerRecorrido = useCallback(() => {
+    cerrarBienvenida();
+    setTimeout(iniciarRecorrido, 200); // espera a que la ventana de bienvenida desaparezca
+  }, [cerrarBienvenida]);
+  const [ancho, setAncho] = useState(anchoGuardado);
   const [arrastrando, setArrastrando] = useState(false);
   useEffect(() => {
     try { localStorage.setItem(CLAVE_ANCHO, String(ancho)); } catch { /* sin almacenamiento */ }
@@ -219,7 +224,7 @@ export default function App() {
           seleccion={seleccion} onSelect={elegir}
         />
       </main>
-            {bienvenida && <Bienvenida onCerrar={cerrarBienvenida} />}
+        {bienvenida && <Bienvenida onCerrar={cerrarBienvenida} onRecorrido={hacerRecorrido} />}
     </div>
   );
 }
