@@ -117,4 +117,4 @@ aside h2 { border-bottom: 2px solid var(--alt, transparent); padding-bottom: 3px
 /* Espera con Carpi */
 .cargando { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .espera-flotante { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 16px 8px 10px; color: var(--muted); font-size: 13px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); pointer-events: none; }
-.espera-flotante .cargando { flex-direction: row; gap: 10px; }
+.espera-flotante .cargando { flex-direction: row; gap: 30px; }

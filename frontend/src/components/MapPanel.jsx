@@ -7,6 +7,7 @@ import { ATRIBUCION_MAPA } from '../config.js';
 import { hexARgb } from '../colors.js';
 import { CAMPOS_COLOR, centroPoligono, colorCelda, htmlCelda, limitesDeCeldas, poligonoDeCelda, radioPoblacion, rangoDe } from '../mapData.js';
 import Leyenda from './Leyenda.jsx';
+import Cargando from './Cargando.jsx';
 
 const TILES = {
   claro: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
@@ -186,6 +187,11 @@ export default function MapPanel({ celdas, poblacion, vista, sobreposicion, graf
       <div className="atribucion">{ATRIBUCION_MAPA}{vista.verPoblacion && poblacion.datos ? ' · Población: Kontur (CC BY 4.0)' : ''}</div>
       {celdas.error && <div className="msg">{celdas.error}</div>}
       {!celdas.error && !celdas.cargando && datos && !datos.nodos.length && <div className="msg">Ninguna celda cumple los filtros.</div>}
+        {celdas.cargando && (
+    <div className={datos ? 'espera-flotante' : 'msg'}>
+      <Cargando texto="Cargando el mapa…" tamano={datos ? 56 : 96} />
+    </div>
+  )}
       {vista.verPoblacion && poblacion.error && <div className="aviso-flotante">Capa demográfica: {poblacion.error}</div>}
       {vista.verPoblacion && poblacion.datos && poblacion.datos.n_celdas === 0 && (
         <div className="aviso-flotante">No hay población cargada: corre etls/etl_poblacion_kontur.py</div>

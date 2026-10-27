@@ -3,6 +3,7 @@ import Graph from 'graphology';
 import Sigma from 'sigma';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import Leyenda from './Leyenda.jsx';
+import Cargando from './Cargando.jsx';
 
 const FADED = '#d5dad7';
 const MUCHAS_ARISTAS = 3000; // por encima, las aristas solo se dibujan al elegir o pasar por un nodo
@@ -139,6 +140,11 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
         </div>
       )}
       {estado.error && <div className="msg">{estado.error}</div>}
+      {estado.cargando && (
+    <div className={grafo ? 'espera-flotante' : 'msg'}>
+      <Cargando texto="Armando la red de especies…" tamano={grafo ? 56 : 96} />
+    </div>
+  )}
       {!estado.error && !estado.cargando && grafo && !grafo.nodos.length && <div className="msg">Sin nodos con las condiciones elegidas.</div>}
     </section>
   );
