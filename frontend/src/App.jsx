@@ -186,7 +186,7 @@ export default function App() {
   return (
     <div className="app" style={{ '--ancho-panel': `${ancho}px` }}>
       <header>
-        <h1>RedPrimavera</h1>
+        <h1 className="marca"><Logo tamano={34} /> RedPrimavera</h1>
         <span className="sub">Vulnerabilidad y biodiversidad · Bosque La Primavera</span>
         <span className="estado" role="status" aria-live="polite">
           {celdas.cargando ? 'Cargando…' : celdas.datos ? `${celdas.datos.nodos.length} celdas · resolución ${resolucion}` : 'Sin datos'}
