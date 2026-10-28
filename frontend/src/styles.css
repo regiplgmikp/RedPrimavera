@@ -142,3 +142,5 @@ button.primario:active { transform: translateY(1px) scale(.985); }
   60% { transform: translate(calc(-50% + var(--dx) * .6), var(--dy)) rotate(calc(var(--rot) * .5)); opacity: .9; }
   100% { transform: translate(calc(-50% + var(--dx)), calc(var(--dy) + 40px)) rotate(var(--rot)); opacity: 0; }
 }
+.nota-aristas { transition: opacity .6s ease; }
+.nota-aristas.oculta { opacity: 0; pointer-events: none; }

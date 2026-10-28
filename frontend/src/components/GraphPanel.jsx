@@ -10,6 +10,7 @@ const MUCHAS_ARISTAS = 3000; // por encima, las aristas solo se dibujan al elegi
 
 const DURACION_TRANSICION = 800;     // milisegundos
 const MAX_NODOS_ANIMADOS = 4000;     // tamaño del grafo NUEVO; con más, se cambia de golpe
+const MAX_ARISTAS_VISIBLES = 400;   // en grafos más densos solo se dibujan las más fuertes
 const MAX_ARISTAS_ANIMADAS = 30000;
 const mezclaBBox = (a, b, k) => ({
   x: [a.x[0] + (b.x[0] - a.x[0]) * k, a.x[1] + (b.x[1] - a.x[1]) * k],
@@ -71,7 +72,10 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
   const sigmaRef = useRef(null);
   const graphRef = useRef(null);
   const hoverRef = useRef(null);
-  const animRef = useRef(0);
+  const animRef = useRef(1);
+  const umbralRef = useRef(0);
+  const [notaAristas, setNotaAristas] = useState(null);
+  const [notaVisible, setNotaVisible] = useState(false);
   const aristasRef = useRef(1);   // 0 a 1: qué tan visibles están las aristas
   const bboxRef = useRef(null);   // último encuadre que dibujamos
   const activoRef = useRef(null);
@@ -109,7 +113,7 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
         const activo = hoverRef.current || activoRef.current;
         if (!g) return attrs;
         if (!activo || !g.hasNode(activo)) {
-          if (g.size > MUCHAS_ARISTAS) return { ...attrs, hidden: true };
+          if (g.size > MUCHAS_ARISTAS || (attrs.size ?? 0) < umbralRef.current) return { ...attrs, hidden: true };
           return { ...attrs, color: `rgba(154,167,160,${(0.28 * aristasRef.current).toFixed(3)})` };
         }
         return g.hasExtremity(arista, activo) ? { ...attrs, color: '#5d6a64' } : { ...attrs, hidden: true };
@@ -190,6 +194,22 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
     bboxRef.current = bboxNuevo;
 
     graphRef.current = g;
+    let umbral = 0;
+    let visibles = g.size;
+    if (g.size > MAX_ARISTAS_VISIBLES) {
+      const pesos = [];
+      g.forEachEdge((e, a) => pesos.push(Number(a.size) || 0));
+      pesos.sort((a, b) => b - a);
+      umbral = pesos[MAX_ARISTAS_VISIBLES - 1];
+      visibles = pesos.filter((p) => p >= umbral).length;
+      if (visibles > MAX_ARISTAS_VISIBLES * 2) { umbral = Infinity; visibles = 0; }  // pesos casi iguales: no hay cómo elegir
+    }
+    umbralRef.current = umbral;
+    setNotaAristas(g.size > MAX_ARISTAS_VISIBLES
+      ? (visibles > 0
+        ? `Mostrando las ${visibles} conexiones más fuertes de ${g.size}. Pasa el mouse sobre una especie para ver todas las suyas.`
+        : 'Hay muchísimas conexiones. Pasa el mouse sobre una especie para ver las suyas.')
+      : null);
     r.setGraph(g);
     if (animar) r.setCustomBBox(bboxViejo);
     r.getCamera().animatedReset({ duration: animar ? DURACION_TRANSICION : 0 });
@@ -237,6 +257,13 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
 
   // La selección cambió desde fuera (p. ej. clic en el mapa): redibuja con el resalte
   useEffect(() => { sigmaRef.current?.refresh(); }, [idSel]);
+  // La nota aparece unos segundos al cambiar el grafo y se desvanece sola
+  useEffect(() => {
+    if (!notaAristas) { setNotaVisible(false); return undefined; }
+    setNotaVisible(true);
+    const t = setTimeout(() => setNotaVisible(false), 6000);
+    return () => clearTimeout(t);
+  }, [notaAristas]);
 
   const info = porId.get(hover || idSel);
 
@@ -260,6 +287,9 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
     </div>
   )}
       {!estado.error && !estado.cargando && grafo && !grafo.nodos.length && <div className="msg">Sin nodos con las condiciones elegidas.</div>}
+      {notaAristas && !estado.cargando && (
+        <div className={`aviso-flotante nota-aristas${notaVisible ? '' : ' oculta'}`}>{notaAristas}</div>
+      )}
     </section>
   );
 }
