@@ -10,7 +10,12 @@ def get_driver(uri: str, user: str, password: str):
     se inyecta configuración TLS manual: el propio esquema decide cifrado
     y verificación de certificado.
     """
-    return GraphDatabase.driver(uri, auth=(user, password))
+    return GraphDatabase.driver(
+        uri,
+        auth=(user, password),
+        max_connection_lifetime=200,   # renueva conexiones con más de ~3 min de vida
+        liveness_check_timeout=30,     # si una conexión estuvo quieta >30 s, la prueba antes de usarla
+    )
 
 def verificar_conexion(driver) -> None:
     """Confirma que el driver realmente puede autenticar y hablar con Neo4j
