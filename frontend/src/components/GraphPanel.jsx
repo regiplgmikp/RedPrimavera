@@ -8,6 +8,30 @@ import Cargando from './Cargando.jsx';
 const FADED = '#d5dad7';
 const MUCHAS_ARISTAS = 3000; // por encima, las aristas solo se dibujan al elegir o pasar por un nodo
 
+const DURACION_TRANSICION = 800;     // milisegundos
+const MAX_NODOS_ANIMADOS = 4000;     // tamaño del grafo NUEVO; con más, se cambia de golpe
+const MAX_ARISTAS_ANIMADAS = 30000;
+const mezclaBBox = (a, b, k) => ({
+  x: [a.x[0] + (b.x[0] - a.x[0]) * k, a.x[1] + (b.x[1] - a.x[1]) * k],
+  y: [a.y[0] + (b.y[0] - a.y[0]) * k, a.y[1] + (b.y[1] - a.y[1]) * k],
+});
+function extension(puntos) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const p of puntos) {
+    if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x;
+    if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y;
+  }
+  if (!Number.isFinite(x0)) return null;
+  if (x1 - x0 < 1e-6) { x0 -= 1; x1 += 1; }
+  if (y1 - y0 < 1e-6) { y0 -= 1; y1 += 1; }
+  return { x: [x0, x1], y: [y0, y1] };
+}
+const suave = (t) => 1 - Math.pow(1 - t, 3);
+const prefiereMenosMovimiento = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const bboxValido = (b) => !!b && [...b.x, ...b.y].every(Number.isFinite);
+
+
+
 function posicionesIniciales(grafo) {
   const n = grafo.nodos.length;
   return grafo.nodos.map((nodo, i) => {
@@ -47,6 +71,9 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
   const sigmaRef = useRef(null);
   const graphRef = useRef(null);
   const hoverRef = useRef(null);
+  const animRef = useRef(0);
+  const aristasRef = useRef(1);   // 0 a 1: qué tan visibles están las aristas
+  const bboxRef = useRef(null);   // último encuadre que dibujamos
   const activoRef = useRef(null);
   const [hover, setHover] = useState(null);
   const onSelectRef = useRef(onSelect);
@@ -81,7 +108,10 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
         const g = graphRef.current;
         const activo = hoverRef.current || activoRef.current;
         if (!g) return attrs;
-        if (!activo || !g.hasNode(activo)) return g.size > MUCHAS_ARISTAS ? { ...attrs, hidden: true } : attrs;
+        if (!activo || !g.hasNode(activo)) {
+          if (g.size > MUCHAS_ARISTAS) return { ...attrs, hidden: true };
+          return { ...attrs, color: `rgba(154,167,160,${(0.28 * aristasRef.current).toFixed(3)})` };
+        }
         return g.hasExtremity(arista, activo) ? { ...attrs, color: '#5d6a64' } : { ...attrs, hidden: true };
       },
     });
@@ -108,17 +138,101 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
       sigmaRef.current = null; graphRef.current = null;
     };
   }, []);
-
-  // 2) Cuando cambian los datos, solo se cambia el grafo dentro de la misma instancia
+  
+  // 2) Cuando cambian los datos, se cambia el grafo dentro de la misma instancia, con transición
   useEffect(() => {
     const r = sigmaRef.current;
-    if (!r) return;
+    if (!r) return undefined;
+    cancelAnimationFrame(animRef.current);
     hoverRef.current = null; setHover(null);
+
+    const anterior = graphRef.current;
     const g = grafo && grafo.nodos.length ? construirGrafo(grafo) : new Graph();
+
+    // Encuadre de llegada: la extensión de las posiciones finales del grafo nuevo
+    const puntos = [];
+    g.forEachNode((id, a) => puntos.push({ x: a.x, y: a.y }));
+    const bboxNuevo = extension(puntos);
+
+    // Encuadre de partida: el último que dibujamos nosotros (no el que reporta Sigma)
+    let bboxViejo = bboxRef.current;
+    if (!bboxValido(bboxViejo) && anterior && anterior.order > 0) {
+      const previos = [];
+      anterior.forEachNode((id, a) => previos.push({ x: a.x, y: a.y }));
+      bboxViejo = extension(previos);
+    }
+
+    const animar = !!anterior && anterior.order > 0 && g.order > 0
+      && bboxValido(bboxViejo) && bboxValido(bboxNuevo) && !!r.setCustomBBox
+      && g.order <= MAX_NODOS_ANIMADOS && g.size <= MAX_ARISTAS_ANIMADAS
+      && !prefiereMenosMovimiento();
+
+    const destino = new Map();
+    const origen = new Map();
+    if (animar) {
+      const cx = (bboxViejo.x[0] + bboxViejo.x[1]) / 2;
+      const cy = (bboxViejo.y[0] + bboxViejo.y[1]) / 2;
+      g.forEachNode((id, a) => {
+        destino.set(id, { x: a.x, y: a.y, size: a.size });
+        if (anterior.hasNode(id)) {
+          const p = anterior.getNodeAttributes(id);
+          const ok = Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.size);
+          origen.set(id, ok ? { x: p.x, y: p.y, size: p.size } : { x: cx, y: cy, size: 0 });
+        } else {
+          origen.set(id, { x: cx, y: cy, size: 0 });   // los nodos nuevos brotan del centro
+        }
+      });
+      g.updateEachNodeAttributes((id, a) => ({ ...a, ...origen.get(id) }), { attributes: ['x', 'y', 'size'] });
+    } else {
+      r.setCustomBBox?.(null);
+    }
+    aristasRef.current = animar ? 0 : 1;
+    bboxRef.current = bboxNuevo;
+
     graphRef.current = g;
     r.setGraph(g);
-    r.getCamera().animatedReset({ duration: 0 });
+    if (animar) r.setCustomBBox(bboxViejo);
+    r.getCamera().animatedReset({ duration: animar ? DURACION_TRANSICION : 0 });
     r.refresh();
+    if (!animar) return undefined;
+
+    // Deja todo en su lugar final, pase lo que pase
+    const terminar = () => {
+      g.updateEachNodeAttributes((id, a) => ({ ...a, ...destino.get(id) }), { attributes: ['x', 'y', 'size'] });
+      aristasRef.current = 1;
+      bboxRef.current = bboxNuevo;
+      r.setCustomBBox(null);
+      r.refresh();
+    };
+
+    const inicio = performance.now();
+    let ultimoBBox = bboxViejo;
+    const paso = (ahora) => {
+      try {
+        const t = Math.min(1, (ahora - inicio) / DURACION_TRANSICION);
+        const k = suave(t);
+        g.updateEachNodeAttributes((id, a) => {
+          const o = origen.get(id); const d = destino.get(id);
+          const x = o.x + (d.x - o.x) * k;
+          const y = o.y + (d.y - o.y) * k;
+          const size = o.size + (d.size - o.size) * k;
+          return { ...a, x: Number.isFinite(x) ? x : d.x, y: Number.isFinite(y) ? y : d.y, size: Number.isFinite(size) ? size : d.size };
+        }, { attributes: ['x', 'y', 'size'] });
+        const bb = mezclaBBox(bboxViejo, bboxNuevo, k);
+        ultimoBBox = bboxValido(bb) ? bb : bboxNuevo;
+        bboxRef.current = ultimoBBox;
+        r.setCustomBBox(ultimoBBox);
+        aristasRef.current = suave(Math.max(0, (t - 0.4) / 0.6));   // las aristas aparecen al final
+        r.refresh();
+        if (t < 1) animRef.current = requestAnimationFrame(paso);
+        else terminar();
+      } catch (err) {
+        console.error('Transición del grafo:', err);
+        terminar();
+      }
+    };
+    animRef.current = requestAnimationFrame(paso);
+    return () => cancelAnimationFrame(animRef.current);
   }, [grafo]);
 
   // La selección cambió desde fuera (p. ej. clic en el mapa): redibuja con el resalte
