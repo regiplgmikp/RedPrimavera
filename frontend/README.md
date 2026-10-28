@@ -3,7 +3,7 @@
     cd frontend
     cp .env.example .env      # VITE_API_URL=http://localhost:8000
     npm install
-    npm run dev               # http://localhost:5173
+    npm run dev               # http://localhost:5173 o http://localhost:3000 
     npm test                  # pruebas de la lógica pura (datos/colores/grafo)
 
 Backend: desde la raíz del repositorio, configura `CORS_ORIGINS` con
