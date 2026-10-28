@@ -90,7 +90,15 @@ RedPrimavera/
 ├── utils/
 │   └── neo4j_conn.py             # Conexión y verificación de Neo4j
 ├── frontend/                     # Aplicación React/Vite
+│   ├── public/
+│   │   └── logo-carpi.png        # Silueta del logo (se pinta con el color del tema)
 │   ├── src/
+│   │   ├── components/           # Mapa, grafo, filtros, ayuda, bienvenida y Carpi
+│   │   │   ├── Carpi.jsx         # Mascota: traduce poses a expresiones
+│   │   │   ├── CarpiPersonaje.jsx/.css  # Dibujo y animaciones de Carpi
+│   │   │   ├── Cargando.jsx      # Carpi esperando mientras llegan los datos
+│   │   │   └── Logo.jsx          # Logo del encabezado
+│   │   └── recorrido.js          # Recorrido guiado de la interfaz
 │   ├── test/                     # Pruebas de lógica del cliente
 │   ├── package.json
 │   ├── package-lock.json
@@ -506,9 +514,13 @@ Abre <http://localhost:5173>. La interfaz permite:
   los nodos según sus métricas.
 
 La interfaz muestra una bienvenida la primera vez que se abre en un navegador.
-Desde esa ventana se puede iniciar el recorrido guiado; la preferencia se
-guarda localmente y puede restablecerse borrando los datos del sitio para
-`localhost:5173`.
+Desde esa ventana se puede iniciar el recorrido guiado de diez pasos. También
+hay botones de ayuda junto a los filtros y un botón para volver a abrir la
+bienvenida y repetir el recorrido. La preferencia de bienvenida se guarda en
+`localStorage`; para mostrarla otra vez, borra los datos del sitio para
+`localhost:5173` o usa el botón correspondiente dentro de la aplicación.
+El recorrido usa `driver.js`, que ya está incluido en las dependencias del
+frontend y se instala con `npm ci`.
 
 ## Verificación y diagnóstico
 
@@ -577,6 +589,19 @@ Problemas frecuentes:
 - Cero celdas: genera primero el grid H3 para la resolución consultada.
 - Fallos de importación de `utils`: ejecuta los comandos desde la raíz y
   verifica que el entorno virtual esté activo.
+- `EACCES` o "permission denied" al iniciar Vite en Windows: el puerto
+  5173 puede estar dentro de un rango reservado por Docker o Hyper-V
+  (compruébalo con `netsh interface ipv4 show excludedportrange protocol=tcp`).
+  Inicia el frontend en otro puerto, por ejemplo
+  `npm run dev -- --port 3000`, y asegúrate de que ese origen esté en
+  `CORS_ORIGINS`.
+- La página abre pero dice "No se pudo conectar con la API" aunque el backend
+  responde: el origen del navegador no está en `CORS_ORIGINS` del `.env` de
+  la raíz. Agrégalo y reinicia uvicorn; los cambios de `.env` no se recargan
+  solos.
+- La lista de resultados de `uvicorn --reload` se reinicia sin parar tras
+  instalar paquetes: inicia con `--reload-dir backend` para que no vigile
+  `venv/`.
 
 ## Estado actual
 
@@ -594,12 +619,10 @@ El proyecto ya permite:
   bloques conectados;
 - consultar población estimada de Kontur y superponer el grafo de celdas;
 - seleccionar especies o celdas para iluminar sus relaciones y observaciones.
-
-La relación `ACTUA_SOBRE` todavía no es creada por los ETL. La fórmula del IVC
-ya está implementada, pero requiere que las variables de entrada estén
-disponibles para que una celda reciba un valor completo. La población de
-Kontur permanece en su resolución nativa (H3 8), y las métricas de red se
-recalculan sobre el subconjunto filtrado que solicita cada consulta.
+- guiar a quien usa la herramienta por primera vez con una bienvenida, ayudas
+  junto a cada filtro, un recorrido de diez pasos y la mascota Carpi;
+- ajustar el ancho del panel de filtros y seguir el modo claro u oscuro del
+  sistema.
 
 ## Licencias y atribuciones de datos
 
@@ -609,3 +632,14 @@ atribución **CC BY 4.0**:
 Las demás capas y observaciones conservan las condiciones de uso de sus
 fuentes originales; revisa esas licencias antes de redistribuir los datos
 descargados.
+
+## Notas de Caché
+
+Para que la interfaz responda rápido, `/subgrafos/celdas` y
+`/subgrafos/especies` guardan sus respuestas en memoria durante 10 minutos
+(máximo 30 consultas distintas por endpoint). La primera consulta con unos
+filtros dados puede tardar, sobre todo en resolución 9; repetirla es casi
+inmediata. La caché se vacía al reiniciar el servidor, y como los ETL
+escriben en Neo4j, tras cargar datos nuevos conviene reiniciar la API para
+no ver resultados anteriores.
+

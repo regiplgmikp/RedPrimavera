@@ -118,3 +118,27 @@ aside h2 { border-bottom: 2px solid var(--alt, transparent); padding-bottom: 3px
 .cargando { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .espera-flotante { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 16px 8px 10px; color: var(--muted); font-size: 13px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); pointer-events: none; }
 .espera-flotante .cargando { flex-direction: row; gap: 30px; }
+
+/* Botón "Aplicar filtros" con ráfaga */
+.boton-aplicar { position: relative; margin-top: 14px; }
+.boton-aplicar button.primario { margin-top: 0; }
+button.primario:active { transform: translateY(1px) scale(.985); }
+.boton-aplicar.secundario { margin-top: 8px; }
+.boton-aplicar button.secundario { margin-top: 0; }
+.chispas { position: absolute; left: 0; right: 0; top: 0; height: 0; pointer-events: none; }
+.chispa { position: absolute; top: 0; display: block; opacity: 0; animation: chispa-sube ease-out forwards; }
+.chispas.abajo { top: 100%; }
+.chispa svg { display: block; width: 100%; height: 100%; }
+.chispa.estrella { color: #F4B72E; }
+.chispa.pluma { color: var(--alt, var(--accent)); animation-name: pluma-vuela; animation-timing-function: ease-in-out; }
+@keyframes chispa-sube {
+  0% { transform: translate(-50%, 0) scale(.3) rotate(0deg); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), var(--dy)) scale(1) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes pluma-vuela {
+  0% { transform: translate(-50%, 0) rotate(0deg); opacity: 0; }
+  15% { opacity: 1; }
+  60% { transform: translate(calc(-50% + var(--dx) * .6), var(--dy)) rotate(calc(var(--rot) * .5)); opacity: .9; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(var(--dy) + 40px)) rotate(var(--rot)); opacity: 0; }
+}

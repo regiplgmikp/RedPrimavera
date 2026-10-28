@@ -2,6 +2,7 @@ import React from 'react';
 import { CAMPOS_COLOR } from '../mapData.js';
 import BuscadorEspecies from './BuscadorEspecies.jsx';
 import Ayuda from './Ayuda.jsx';
+import BotonAplicar from './BotonAplicar.jsx';
 
 function Campo({ id, etiqueta, ayuda, children }) {
   return (
@@ -75,8 +76,8 @@ export default function FilterPanel({ form, setForm, vista, cambiarVista, resolu
         {num('min_celdas_compartidas', { min: 1, max: 50 })}
       </Campo>
 
-      <button className="primario" onClick={aplicar}>Aplicar filtros</button>
-      <button className="secundario" onClick={limpiar}>Limpiar</button>
+      <BotonAplicar onClick={aplicar}>Aplicar filtros</BotonAplicar>
+      <BotonAplicar clase="secundario" direccion="abajo" onClick={limpiar}>Limpiar</BotonAplicar>
 
       <h2>Mapa</h2>
       <Campo id="colorMapa" etiqueta="Color de las celdas"
