@@ -15,6 +15,7 @@ const POSES_PASOS = [
   'sorprendida', // 5 Ojo con este botón
   'senalando',   // 6 Qué pinta el mapa
   'hablando',    // 7 El mapa
+  'senalando',
   'hablando',    // 8 El grafo
   'curiosa',     // 9 ¿Dudas?
   'hola',        // 10 Volver a empezar
@@ -67,6 +68,8 @@ function ponerCarpi(popover, indice) {
         description: 'Cada hexágono es una zona del bosque. Si tocas uno, el grafo te muestra las especies que se han visto ahí.' } },
       { element: '.paneles > :nth-child(2)', popover: { title: 'El grafo', side: 'left', align: 'center',
         description: 'Cada punto es una especie y las líneas unen a las que suelen verse en las mismas zonas. Toca una y el mapa ilumina dónde se ha visto.' } },
+      { element: '.herramientas', popover: { title: 'Mira la red en 3D', side: 'left', align: 'start',
+        description: 'Con «Vista 3D» el grafo se vuelve una nube que puedes arrastrar para girar y acercar con la rueda. Ahí aparece «Girar», que la mueve despacito sola.' } },
       { element: '.ayuda-mini', popover: { title: '¿Dudas?', side: 'right',
         description: 'Estos signos de interrogación te explican cada filtro con palabras sencillas.' } },
       { element: '.ayuda-btn', popover: { title: 'Volver a empezar', side: 'bottom', align: 'end',
