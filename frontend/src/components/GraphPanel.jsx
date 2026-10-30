@@ -4,6 +4,7 @@ import Sigma from 'sigma';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import Leyenda from './Leyenda.jsx';
 import Cargando from './Cargando.jsx';
+import Destellos, { tipoAlAzar } from './Destellos.jsx';
 
 const FADED = '#d5dad7';
 const MUCHAS_ARISTAS = 3000; // por encima, las aristas solo se dibujan al elegir o pasar por un nodo
@@ -76,6 +77,7 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
   const umbralRef = useRef(0);
   const [notaAristas, setNotaAristas] = useState(null);
   const [notaVisible, setNotaVisible] = useState(false);
+  const [destello, setDestello] = useState(null);
   const aristasRef = useRef(1);   // 0 a 1: qué tan visibles están las aristas
   const bboxRef = useRef(null);   // último encuadre que dibujamos
   const activoRef = useRef(null);
@@ -256,7 +258,18 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
   }, [grafo]);
 
   // La selección cambió desde fuera (p. ej. clic en el mapa): redibuja con el resalte
-  useEffect(() => { sigmaRef.current?.refresh(); }, [idSel]);
+  useEffect(() => {
+    const r = sigmaRef.current; const g = graphRef.current;
+    r?.refresh();
+    if (!idSel) { setDestello(null); return undefined; }
+    if (!r || !g || !g.hasNode(idSel) || prefiereMenosMovimiento()) return undefined;
+    const a = g.getNodeAttributes(idSel);
+    const p = r.graphToViewport({ x: a.x, y: a.y });
+    setDestello({ llave: Date.now(), x: p.x, y: p.y, tipo: tipoAlAzar() });
+    const t = setTimeout(() => setDestello(null), 2600);
+    return () => clearTimeout(t);
+  }, [idSel]);
+
   // La nota aparece unos segundos al cambiar el grafo y se desvanece sola
   useEffect(() => {
     if (!notaAristas) { setNotaVisible(false); return undefined; }
@@ -271,6 +284,7 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
     <section className="panel">
       <h3>Grafo · {grafo?.titulo || '—'}</h3>
       <div ref={contenedor} className="sigma" aria-label="Grafo de relaciones" />
+      {destello && <div className="efectos"><Destellos {...destello} /></div>}
       {grafo && grafo.nodos.length > 0 && <Leyenda modo="grafo" leyenda={grafo.leyenda} />}
       {info && (
         <div className="info" role="status">

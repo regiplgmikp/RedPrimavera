@@ -144,3 +144,32 @@ button.primario:active { transform: translateY(1px) scale(.985); }
 }
 .nota-aristas { transition: opacity .6s ease; }
 .nota-aristas.oculta { opacity: 0; pointer-events: none; }
+
+/* Destellos al elegir una especie */
+.efectos { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 2; }
+.destellos { position: absolute; width: 0; height: 0; }
+.destello { position: absolute; left: 0; top: 0; display: block; opacity: 0; animation: destello-estrella ease-out forwards; }
+.destello svg { display: block; width: 100%; height: 100%; }
+.destello.estrellas { color: #F4B72E; }
+.destello.luciernagas { border-radius: 50%; background: #EDF28A; box-shadow: 0 0 8px 3px rgba(237, 242, 138, .75); animation-name: destello-luciernaga; animation-timing-function: ease-in-out; }
+.destello.hoja { color: var(--accent); animation-name: destello-caer; animation-timing-function: ease-in-out; }
+.destello.pluma { color: var(--alt, var(--accent)); animation-name: destello-caer; animation-timing-function: ease-in-out; }
+@keyframes destello-estrella {
+  0% { transform: translate(-50%, -50%) scale(.2) rotate(0deg); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes destello-luciernaga {
+  0% { transform: translate(-50%, -50%) scale(.3); opacity: 0; }
+  25% { opacity: 1; }
+  50% { opacity: .35; }
+  70% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); opacity: 0; }
+}
+@keyframes destello-caer {
+  0% { transform: translate(-50%, -50%) rotate(0deg); opacity: 0; }
+  15% { opacity: 1; }
+  60% { transform: translate(calc(-50% + var(--dx) * .7), calc(-50% + var(--dy))) rotate(calc(var(--rot) * .6)); opacity: .9; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + var(--cae))) rotate(var(--rot)); opacity: 0; }
+}
+
