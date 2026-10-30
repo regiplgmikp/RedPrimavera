@@ -5,6 +5,7 @@ import forceAtlas2 from 'graphology-layout-forceatlas2';
 import Leyenda from './Leyenda.jsx';
 import Cargando from './Cargando.jsx';
 import Destellos, { tipoAlAzar } from './Destellos.jsx';
+import Grafo3D from './Grafo3D.jsx';
 
 const FADED = '#d5dad7';
 const MUCHAS_ARISTAS = 3000; // por encima, las aristas solo se dibujan al elegir o pasar por un nodo
@@ -75,6 +76,7 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
   const hoverRef = useRef(null);
   const animRef = useRef(1);
   const umbralRef = useRef(0);
+  const radioHaloRef = useRef(120);   // radio de la cáscara donde se acomodan las especies sin conexión
   const [notaAristas, setNotaAristas] = useState(null);
   const [notaVisible, setNotaVisible] = useState(false);
   const [destello, setDestello] = useState(null);
@@ -83,6 +85,8 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
   const activoRef = useRef(null);
   const [hover, setHover] = useState(null);
   const onSelectRef = useRef(onSelect);
+  const [vista3d, setVista3d] = useState(false);
+  const [girando3d, setGirando3d] = useState(true);
   onSelectRef.current = onSelect;
 
   const tipoSel = grafo?.tipo === 'especies' ? 'especie' : 'celda';
@@ -284,6 +288,17 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
     <section className="panel">
       <h3>Grafo · {grafo?.titulo || '—'}</h3>
       <div ref={contenedor} className="sigma" aria-label="Grafo de relaciones" />
+      <div className="herramientas">
+        <button className="flotante" aria-pressed={vista3d} onClick={() => setVista3d((v) => !v)}
+                title="Ver la red en 3D: arrastra para girar, rueda para acercar">Vista 3D</button>
+        {vista3d && (
+          <button className="flotante" aria-pressed={girando3d} onClick={() => setGirando3d((v) => !v)}
+                  title="Gira la red despacio">Girar</button>
+        )}
+      </div>
+      {vista3d && grafo && grafo.nodos.length > 0 && (
+        <Grafo3D grafo={grafo} idSel={idSel} tipo={tipoSel} girando={girando3d} onSelect={onSelect} onHover={setHover} />
+      )}
       {destello && <div className="efectos"><Destellos {...destello} /></div>}
       {grafo && grafo.nodos.length > 0 && <Leyenda modo="grafo" leyenda={grafo.leyenda} />}
       {info && (

@@ -173,3 +173,8 @@ button.primario:active { transform: translateY(1px) scale(.985); }
   100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + var(--cae))) rotate(var(--rot)); opacity: 0; }
 }
 
+/* Botones sobre el grafo y vista 3D */
+.herramientas { position: absolute; top: 8px; right: 12px; z-index: 3; display: flex; gap: 8px; }
+.herramientas .flotante { position: static; }
+.herramientas .flotante[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.grafo3d { position: absolute; inset: 0; z-index: 1; background: var(--bg); }
