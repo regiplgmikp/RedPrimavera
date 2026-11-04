@@ -29,10 +29,11 @@ Para probar la aplicación con una base de Neo4j ya cargada:
    cd ..
    ```
 
-3. En una terminal, desde la raíz del repositorio, inicia la API:
+3. En una terminal, desde la raíz del repositorio, inicia la API en el puerto
+   configurado por `frontend/.env.example`:
 
    ```powershell
-   python -m uvicorn backend.main:app --reload
+   python -m uvicorn backend.main:app --reload --port 8100
    ```
 
 4. En otra terminal, inicia el frontend:
@@ -43,7 +44,10 @@ Para probar la aplicación con una base de Neo4j ya cargada:
    ```
 
 5. Abre <http://localhost:5173>. La API estará disponible en
-   <http://localhost:8000/docs>.
+   <http://localhost:8100/docs>.
+
+   Si prefieres usar el puerto predeterminado de Uvicorn (`8000`), cambia
+   `VITE_API_URL` a `http://127.0.0.1:8000` y omite `--port 8100`.
 
 Este flujo solo inicia los servicios. Si la base de datos aún no tiene datos,
 ejecuta primero el [flujo de carga recomendado](#flujo-de-carga-recomendado).
@@ -93,12 +97,13 @@ RedPrimavera/
 │   ├── public/
 │   │   └── logo-carpi.png        # Silueta del logo (se pinta con el color del tema)
 │   ├── src/
-│   │   ├── components/           # Mapa, grafo, filtros, ayuda, bienvenida y Carpi
-│   │   │   ├── Carpi.jsx         # Mascota: traduce poses a expresiones
-│   │   │   ├── CarpiPersonaje.jsx/.css  # Dibujo y animaciones de Carpi
-│   │   │   ├── Cargando.jsx      # Carpi esperando mientras llegan los datos
-│   │   │   └── Logo.jsx          # Logo del encabezado
-│   │   └── recorrido.js          # Recorrido guiado de la interfaz
+│   │   ├── components/            # Mapa, grafos, filtros, ayuda y Carpi
+│   │   │   ├── Grafo3D.jsx        # Vista 3D opcional de la red
+│   │   │   ├── Carpi.jsx          # Mascota: traduce poses a expresiones
+│   │   │   ├── Cargando.jsx       # Estado de carga con Carpi
+│   │   │   ├── bienvenida.jsx     # Ventana de bienvenida
+│   │   │   └── logo.jsx           # Logo del encabezado
+│   │   └── recorrido.js           # Recorrido guiado de la interfaz
 │   ├── test/                     # Pruebas de lógica del cliente
 │   ├── package.json
 │   ├── package-lock.json
@@ -185,7 +190,7 @@ Usa `npm install` si necesitas actualizar intencionalmente
 El archivo `frontend/.env` permite configurar la URL del backend:
 
 ```env
-VITE_API_URL=http://127.0.0.1:8000
+VITE_API_URL=http://127.0.0.1:8100
 ```
 
 Si se cambia ese valor, el origen del frontend también debe estar incluido en
@@ -195,6 +200,8 @@ desarrollo:
 ```env
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
+
+El puerto de `VITE_API_URL` debe coincidir con el puerto usado por Uvicorn.
 
 ### Autenticar Google Earth Engine
 
@@ -429,7 +436,7 @@ Inicia el backend desde la raíz; hacerlo desde `backend/` puede impedir que se
 encuentren `utils` y `.env`:
 
 ```powershell
-python -m uvicorn backend.main:app --reload
+python -m uvicorn backend.main:app --reload --port 8100
 ```
 
 La API necesita `NEO4J_URI` y `NEO4J_PASSWORD` para crear el driver bajo
@@ -438,9 +445,9 @@ viva, ejecuta una consulta sencilla contra Neo4j.
 
 URLs útiles:
 
-- API: <http://localhost:8000>
-- Swagger: <http://localhost:8000/docs>
-- OpenAPI: <http://localhost:8000/openapi.json>
+- API: <http://localhost:8100>
+- Swagger: <http://localhost:8100/docs>
+- OpenAPI: <http://localhost:8100/openapi.json>
 
 ### Endpoints disponibles
 
@@ -480,16 +487,16 @@ respuesta.
 Ejemplos:
 
 ```powershell
-curl "http://localhost:8000/subgrafos/celdas?resolucion=8&ivc_min=0.6&distancia_camino_max=1000"
-curl "http://localhost:8000/subgrafos/especies?resolucion=8&ivc_min=0.6&min_celdas_compartidas=2"
+curl "http://localhost:8100/subgrafos/celdas?resolucion=8&ivc_min=0.6&distancia_camino_max=1000"
+curl "http://localhost:8100/subgrafos/especies?resolucion=8&ivc_min=0.6&min_celdas_compartidas=2"
 ```
 
 Ejemplos con `curl`:
 
 ```powershell
-curl http://localhost:8000/health
-curl http://localhost:8000/grafo/especies
-curl "http://localhost:8000/celdas?resolucion=9&bbox=-103.6,20.5,-103.4,20.8"
+curl http://localhost:8100/health
+curl http://localhost:8100/grafo/especies
+curl "http://localhost:8100/celdas?resolucion=9&bbox=-103.6,20.5,-103.4,20.8"
 ```
 
 ### Iniciar el frontend
@@ -512,6 +519,9 @@ Abre <http://localhost:5173>. La interfaz permite:
 - seleccionar una celda para consultar sus especies;
 - superponer el grafo territorial sobre el mapa y cambiar el tamaño/color de
   los nodos según sus métricas.
+- alternar entre el grafo 2D de Sigma y una vista 3D interactiva; la vista 3D
+  limita los enlaces visibles para conservar la fluidez y permite activar o
+  desactivar la rotación automática.
 
 La interfaz muestra una bienvenida la primera vez que se abre en un navegador.
 Desde esa ventana se puede iniciar el recorrido guiado de diez pasos. También
@@ -561,6 +571,10 @@ npm run build
 versión de producción en `frontend/dist/` y `npm run preview` permite
 servir esa compilación localmente.
 
+La dependencia `3d-force-graph` se carga de forma diferida al abrir la vista
+3D, por lo que no es necesario descargar su código para usar únicamente el
+mapa y el grafo 2D.
+
 También hay scripts auxiliares para revisar la red y los datos:
 
 ```powershell
@@ -602,6 +616,9 @@ Problemas frecuentes:
 - La lista de resultados de `uvicorn --reload` se reinicia sin parar tras
   instalar paquetes: inicia con `--reload-dir backend` para que no vigile
   `venv/`.
+- Si el frontend muestra una API en `8000` pero se inició Uvicorn en `8100`
+  (o al revés), alinea `VITE_API_URL` y el argumento `--port`, reinicia Vite
+  y vuelve a cargar la página.
 
 ## Estado actual
 
@@ -621,6 +638,7 @@ El proyecto ya permite:
 - seleccionar especies o celdas para iluminar sus relaciones y observaciones.
 - guiar a quien usa la herramienta por primera vez con una bienvenida, ayudas
   junto a cada filtro, un recorrido de diez pasos y la mascota Carpi;
+- visualizar la red en 2D o 3D desde el panel del grafo;
 - ajustar el ancho del panel de filtros y seguir el modo claro u oscuro del
   sistema.
 
@@ -642,4 +660,3 @@ filtros dados puede tardar, sobre todo en resolución 9; repetirla es casi
 inmediata. La caché se vacía al reiniciar el servidor, y como los ETL
 escriben en Neo4j, tras cargar datos nuevos conviene reiniciar la API para
 no ver resultados anteriores.
-

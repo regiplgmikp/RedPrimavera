@@ -3,6 +3,7 @@ import { CAMPOS_COLOR } from '../mapData.js';
 import BuscadorEspecies from './BuscadorEspecies.jsx';
 import Ayuda from './Ayuda.jsx';
 import BotonAplicar from './BotonAplicar.jsx';
+import { colorTaxon } from '../colors.js';
 
 function Campo({ id, etiqueta, ayuda, children }) {
   return (
@@ -14,10 +15,17 @@ function Campo({ id, etiqueta, ayuda, children }) {
 }
 
 export default function FilterPanel({ form, setForm, vista, cambiarVista, resolucionEfectiva, 
-  aplicar, limpiar, metaCeldas, metaEspecies, omitidos,especieSel, avisoEspecie, onElegirEspecie, onQuitarEspecie }) {
+  aplicar, limpiar, metaCeldas, metaEspecies, omitidos,especieSel, avisoEspecie, onElegirEspecie, onQuitarEspecie, taxones }) {
   const num = (id, props = {}) => (
     <input id={id} type="number" placeholder="sin filtro" value={form[id]} {...props}
-      onChange={(e) => setForm({ ...form, [id]: e.target.value })}
+      onChange={(e) => {
+        let v = e.target.value;
+        if (v !== '' && !Number.isNaN(Number(v))) {
+          if (props.max !== undefined && Number(v) > props.max) v = String(props.max);
+          if (props.min !== undefined && Number(v) < props.min) v = String(props.min);
+        }
+        setForm({ ...form, [id]: v });
+      }}
       onKeyDown={(e) => e.key === 'Enter' && aplicar()} />
   );
   const sel = (id, opciones) => (
@@ -33,6 +41,14 @@ export default function FilterPanel({ form, setForm, vista, cambiarVista, resolu
   );
   const esEsp = vista.grafo === 'especies';
 
+  const alternarTaxon = (nombre) => {
+  const ocultos = new Set(vista.taxonesOcultos);
+  if (ocultos.has(nombre)) ocultos.delete(nombre); else ocultos.add(nombre);
+    cambiarVista({ taxonesOcultos: [...ocultos] });
+  };
+  const nOcultos = vista.taxonesOcultos.length;
+  const totalTaxones = taxones?.length || 0;
+  const resumenTaxones = nOcultos === 0 ? 'Todos los grupos' : `${totalTaxones - nOcultos} de ${totalTaxones} grupos`;
   return (
     <aside>
       
@@ -52,10 +68,11 @@ export default function FilterPanel({ form, setForm, vista, cambiarVista, resolu
         ayuda="Lo contrario al anterior: deja solo las zonas con un IVC menor o igual a este valor. Sirve para ver las menos vulnerables.">
         {num('ivc_max', { min: 0, max: 1, step: 0.05 })}
       </Campo>
-      <Campo id="frecuencia_min" etiqueta="Frecuencia de incendios mínima (por año)"
+      <Campo id="frecuencia_min" etiqueta="Frecuencia de incendios mínima (0 a 1)"
         ayuda="Qué tan seguido se detectó un incendio en esa zona desde el año 2000, con imágenes de satélite. 0.2 significa un incendio cada 5 años. Deja solo las zonas con al menos esta frecuencia.">
         {num('frecuencia_min', { min: 0, max: 1, step: 0.02 })}
       </Campo>
+      
       <Campo id="distancia_camino_max" etiqueta="Distancia máxima a camino (m)"
         ayuda="Qué tan lejos está el camino más cercano al centro de cada hexágono. Deja solo las zonas a esta distancia o menos. En el índice, estar cerca de un camino aumenta la exposición.">
         {num('distancia_camino_max', { min: 0, step: 50 })}
@@ -75,6 +92,30 @@ export default function FilterPanel({ form, setForm, vista, cambiarVista, resolu
         ayuda="Dos especies se conectan en la red si se han observado en las mismas zonas (hexágonos). Este número es cuántas zonas deben compartir como mínimo para dibujar la conexión. Con 2 hay más conexiones; si lo subes, quedan solo las más fuertes y la red se ve más limpia. Si hay demasiadas, el sistema puede subirlo solo para que la página no se trabe.">
         {num('min_celdas_compartidas', { min: 1, max: 50 })}
       </Campo>
+
+            {esEsp && totalTaxones > 0 && (
+        <Campo id="taxones" etiqueta="Grupos de especies"
+          ayuda="Elige qué grupos quieres ver en el grafo. Si desmarcas uno, desaparece y los demás se quedan conectados entre sí. Cambia al instante, sin pulsar «Aplicar filtros». El número entre paréntesis es cuántas especies tiene cada grupo.">
+          <details className="desplegable">
+            <summary>{resumenTaxones}</summary>
+            <div className="desplegable-lista">
+              {taxones.map((t) => (
+                <label key={t.nombre} className="check">
+                  <input type="checkbox" checked={!vista.taxonesOcultos.includes(t.nombre)}
+                    onChange={() => alternarTaxon(t.nombre)} />
+                  <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2,
+                    background: colorTaxon(t.nombre), margin: '0 6px 0 2px' }} />
+                  {t.nombre} <small>({t.total})</small>
+                </label>
+              ))}
+              {nOcultos > 0 && (
+                <button type="button" className="enlace"
+                  onClick={() => cambiarVista({ taxonesOcultos: [] })}>Mostrar todos</button>
+              )}
+            </div>
+          </details>
+        </Campo>
+      )}
 
       <BotonAplicar onClick={aplicar}>Aplicar filtros</BotonAplicar>
       <BotonAplicar clase="secundario" direccion="abajo" onClick={limpiar}>Limpiar</BotonAplicar>

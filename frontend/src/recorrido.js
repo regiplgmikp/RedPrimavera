@@ -12,10 +12,11 @@ const POSES_PASOS = [
   'senalando',   // 2 Tamaño de los hexágonos
   'senalando',   // 3 Vulnerabilidad
   'curiosa',     // 4 ¿Buscas a alguien?
+  'senalando',  // 5 Elige a qué grupos ver
   'sorprendida', // 5 Ojo con este botón
   'senalando',   // 6 Qué pinta el mapa
   'hablando',    // 7 El mapa
-  'senalando',
+  'senalando', 
   'hablando',    // 8 El grafo
   'curiosa',     // 9 ¿Dudas?
   'hola',        // 10 Volver a empezar
@@ -60,6 +61,8 @@ function ponerCarpi(popover, indice) {
         description: 'Aquí filtras por el índice de vulnerabilidad. Prueba con 0.6 para ver solo las zonas más delicadas.' } },
       { element: '#buscar-especie', popover: { title: '¿Buscas a alguien?', side: 'right',
         description: 'Escribe «carpintero» y verás en qué zonas lo han visto. ¡Yo soy fan!' } },
+      { element: '.desplegable', popover: { title: 'Elige a qué grupos ver', side: 'right',
+        description: 'Aquí decides qué grupos de especies aparecen en el grafo: aves, plantas, insectos… Desmarca los que no quieras ver y la red se actualizará.' } },
       { element: 'aside .primario', popover: { title: 'Ojo con este botón', side: 'right',
         description: 'Los filtros solo se aplican cuando lo pulsas.' } },
       { element: '#colorMapa', popover: { title: 'Qué pinta el mapa', side: 'right',

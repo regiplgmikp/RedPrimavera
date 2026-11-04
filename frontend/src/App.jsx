@@ -17,6 +17,7 @@ export const FILTROS_VACIOS = {
 const VISTA_INICIAL = {
   resolucion: 8, colorMapa: 'ivc', disposicion: 'lado', sobreponer: false, verPoblacion: false,
   dinamico: false, autoRes: false, grafo: 'especies', colorGrafo: 'taxonomia', tamanoGrafo: 'intermediacion_norm',
+  taxonesOcultos: [],
 };
 const esAbort = (e) => e?.name === 'AbortError';
 
@@ -146,7 +147,11 @@ export default function App() {
   const grafo = useMemo(() => {
     if (vista.grafo === 'especies') {
       const color = vista.colorGrafo === 'comunidad' ? 'comunidad' : 'taxonomia';
-      const completo = especies.datos ? grafoEspecies(especies.datos, { colorPor: color, tamanoPor: vista.tamanoGrafo }) : null;
+      const todas = especies.datos ? grafoEspecies(especies.datos, { colorPor: color, tamanoPor: vista.tamanoGrafo }) : null;
+      const ocultos = new Set(vista.taxonesOcultos);
+      const completo = todas && ocultos.size
+        ? { ...subgrafoDeEspecies(todas, todas.nodos.filter((n) => !ocultos.has(n.taxon)).map((n) => n.id)), titulo: todas.titulo }
+        : todas;
       if (completo && focoActivo && especiesCelda.id === focoActivo && especiesCelda.datos) {
         const sub = subgrafoDeEspecies(completo, especiesCelda.datos.especies.map((e) => e.id));
         return { ...sub, titulo: `Especies de la celda ${focoActivo} (${sub.nodos.length})` };
@@ -155,8 +160,17 @@ export default function App() {
     }
     const color = ['institucion', 'ivc', 'bloque'].includes(vista.colorGrafo) ? vista.colorGrafo : 'institucion';
     return celdas.datos ? grafoCeldas(celdas.datos, { colorPor: color, tamanoPor: vista.tamanoGrafo === 'fuerza_norm' ? 'intermediacion_norm' : vista.tamanoGrafo }) : null;
-  }, [vista.grafo, vista.colorGrafo, vista.tamanoGrafo, especies.datos, celdas.datos, focoActivo, especiesCelda]);
+    }, [vista.grafo, vista.colorGrafo, vista.tamanoGrafo, vista.taxonesOcultos, especies.datos, celdas.datos, focoActivo, especiesCelda]);
 
+  // Grupos que existen en la red (de la más numerosa a la menos), para las casillas del filtro
+  const taxones = useMemo(() => {
+    const cuenta = new Map();
+    for (const n of especies.datos?.nodos || []) {
+      const t = n.reino_iconico || 'sin clasificar';
+      cuenta.set(t, (cuenta.get(t) || 0) + 1);
+    }
+    return [...cuenta].sort((a, b) => b[1] - a[1]).map(([nombre, total]) => ({ nombre, total }));
+  }, [especies.datos]);
     // Especie elegida (desde el buscador o con clic en el grafo) y aviso si no sale dibujada en el grafo
   const especieSeleccionada = useMemo(() => {
     if (seleccion?.tipo !== 'especie') return null;
@@ -195,7 +209,7 @@ export default function App() {
         </span>
       </header>
       <FilterPanel
-        form={form} setForm={setForm} vista={vista} cambiarVista={cambiarVista}
+        form={form} setForm={setForm} vista={vista} cambiarVista={cambiarVista} taxones={taxones}
         resolucionEfectiva={resolucion}
         aplicar={() => {
           const mc = Math.min(50, Math.max(1, Number(form.min_celdas_compartidas) || 1));

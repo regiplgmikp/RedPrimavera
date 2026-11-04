@@ -43,7 +43,8 @@ export function grafoEspecies(data, { colorPor = 'taxonomia', tamanoPor = 'inter
       color,
       lat: n.lat ?? null,
       lon: n.lon ?? null,
-      grupo: colorPor === 'comunidad' ? (m.comunidad == null ? 'sin comunidad' : `comunidad ${m.comunidad + 1}`) : (n.reino_iconico || 'sin clasificar'),
+      grupo: colorPor === 'comunidad' ? (m.comunidad == null ? 'sin comunidad' : `comunidad ${m.comunidad + 1}`) : (n.reino_iconico|| 'sin clasificar'),
+      taxon: n.reino_iconico || 'sin clasificar',
       detalle: { grado: m.grado, fuerza: m.fuerza, intermediacion: m.intermediacion, comunidad: m.comunidad, celdas: n.n_celdas, tipo: n.tipo },
     };
   });
