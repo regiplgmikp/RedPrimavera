@@ -6,6 +6,7 @@ import Leyenda from './Leyenda.jsx';
 import Cargando from './Cargando.jsx';
 import Destellos, { tipoAlAzar } from './Destellos.jsx';
 import Grafo3D from './Grafo3D.jsx';
+import TarjetaEspecie from './TarjetaEspecie.jsx';
 
 const FADED = '#d5dad7';
 const MUCHAS_ARISTAS = 3000; // por encima, las aristas solo se dibujan al elegir o pasar por un nodo
@@ -282,6 +283,12 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
     return () => clearTimeout(t);
   }, [notaAristas]);
 
+    // Tarjeta de la especie elegida: se cierra sola con su × sin tocar la selección ni la celda enfocada
+  const [tarjetaCerrada, setTarjetaCerrada] = useState(null);
+  useEffect(() => { if (!seleccion) setTarjetaCerrada(null); }, [seleccion]);
+  const nodoSel = seleccion?.tipo === 'especie' ? porId.get(seleccion.id) : null;
+  const comunLocal = nodoSel && nodoSel.label !== nodoSel.id ? nodoSel.label.slice(nodoSel.id.length + 2, -1) : null;
+
   const info = porId.get(hover || idSel);
 
   return (
@@ -301,6 +308,10 @@ export default function GraphPanel({ grafo, estado, seleccion, onSelect }) {
       )}
       {destello && <div className="efectos"><Destellos {...destello} /></div>}
       {grafo && grafo.nodos.length > 0 && <Leyenda modo="grafo" leyenda={grafo.leyenda} />}
+      {seleccion?.tipo === 'especie' && tarjetaCerrada !== seleccion.id && (
+        <TarjetaEspecie nombre={seleccion.id} comunLocal={comunLocal}
+                        onCerrar={() => setTarjetaCerrada(seleccion.id)} />
+      )}
       {info && (
         <div className="info" role="status">
           <b>{info.label}</b><br />{info.grupo}
