@@ -8,6 +8,7 @@ import { hexARgb } from '../colors.js';
 import { CAMPOS_COLOR, centroPoligono, colorCelda, htmlCelda, limitesDeCeldas, poligonoDeCelda, radioPoblacion, rangoDe } from '../mapData.js';
 import Leyenda from './Leyenda.jsx';
 import Cargando from './Cargando.jsx';
+import ErrorCarpi from './ErrorCarpi.jsx';
 
 const TILES = {
   claro: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
@@ -29,7 +30,7 @@ function usarTemaOscuro() {
   return oscuro;
 }
 
-export default function MapPanel({ celdas, poblacion, vista, sobreposicion, grafoTipo, observaciones, seleccion, onSelect, onEncuadre }) {
+export default function MapPanel({ celdas, poblacion, vista, sobreposicion, grafoTipo, observaciones, seleccion, onSelect, onEncuadre, onReintentar }) {
   const contenedor = useRef(null);
   const [tam, setTam] = useState({ width: 800, height: 600 });
   const [tip, setTip] = useState(null); // información bajo el cursor: { x, y, html }
@@ -185,7 +186,7 @@ export default function MapPanel({ celdas, poblacion, vista, sobreposicion, graf
         poblacion={vista.verPoblacion ? poblacion : null} sobreponer={Boolean(sobreposicion)} observaciones={observaciones}
       />
       <div className="atribucion">{ATRIBUCION_MAPA}{vista.verPoblacion && poblacion.datos ? ' · Población: Kontur (CC BY 4.0)' : ''}</div>
-      {celdas.error && <div className="msg">{celdas.error}</div>}
+      {celdas.error && <ErrorCarpi mensaje={celdas.error} onReintentar={onReintentar} />}
       {!celdas.error && !celdas.cargando && datos && !datos.nodos.length && <div className="msg">Ninguna celda cumple los filtros.</div>}
         {celdas.cargando && (
     <div className={datos ? 'espera-flotante' : 'msg'}>

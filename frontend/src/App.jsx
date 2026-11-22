@@ -184,6 +184,8 @@ export default function App() {
   }, [especieSeleccionada, grafo]);
 
   const sobreposicion = useMemo(() => (vista.sobreponer && grafo?.tipo === 'celdas' ? datosSobreposicion(grafo) : null), [vista.sobreponer, grafo]);
+    // Reintentar: crea un objeto nuevo de filtros aplicados y eso vuelve a pedir los datos
+  const reintentar = useCallback(() => setAplicados((a) => ({ ...a })), []);
 
   const cambiarVista = useCallback((cambios) => {
     // la selección de un tipo de grafo no tiene sentido en el otro
@@ -233,10 +235,12 @@ export default function App() {
         <MapPanel
           celdas={celdas} poblacion={poblacion} vista={vista} sobreposicion={sobreposicion}
           grafoTipo={grafo?.tipo} observaciones={observaciones} seleccion={seleccion} onSelect={elegir} onEncuadre={setEncuadre}
+          onReintentar={reintentar}
         />
         <GraphPanel
           grafo={grafo} estado={vista.grafo === 'especies' ? especies : celdas}
           seleccion={seleccion} onSelect={elegir}
+          onReintentar={reintentar}
         />
       </main>
         {bienvenida && <Bienvenida onCerrar={cerrarBienvenida} onRecorrido={hacerRecorrido} />}
